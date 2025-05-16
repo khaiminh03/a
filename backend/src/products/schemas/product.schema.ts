@@ -23,8 +23,8 @@ export class Product {
   @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'Category' })
   categoryId: Types.ObjectId;
 
-  @Prop({ required: true })
-  supplierId: string;
+   @Prop({ type: MongooseSchema.Types.ObjectId, required: true })  // supplierId là ObjectId của người dùng
+    supplierId: Types.ObjectId;
 
   @Prop()
   origin: string;
@@ -34,3 +34,4 @@ export class Product {
 }
 
 export const ProductSchema = SchemaFactory.createForClass(Product);
+ProductSchema.index({ name: 'text' });

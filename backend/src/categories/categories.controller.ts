@@ -68,6 +68,15 @@ export class CategoriesController {
   async remove(@Param('id') id: string): Promise<void> {
     return this.categoriesService.remove(id);
   }
+   @Get(':id')
+   @Get(':id')
+  async getCategoryById(@Param('id') id: string): Promise<Category> {
+    const category = await this.categoriesService.findCategoryById(id);  // Đảm bảo sử dụng đúng tên service
+    if (!category) {
+      throw new Error('Category not found');
+    }
+    return category;
+  }
  
   
 }

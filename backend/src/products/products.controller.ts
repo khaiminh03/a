@@ -1,5 +1,5 @@
 import { 
-    Controller, Post, Get, Put, Delete, Param, Body, UploadedFiles, UseInterceptors,NotFoundException
+    Controller, Post, Get, Query, Req, Param, Body, UploadedFiles, UseInterceptors,NotFoundException
   } from '@nestjs/common';
   import { FilesInterceptor } from '@nestjs/platform-express';
   import { diskStorage } from 'multer';
@@ -8,7 +8,8 @@ import {
   import { ProductsService } from './products.service';
   import { CreateProductDto } from './dto/create-product.dto';
   import { Product } from './schemas/product.schema';
-  
+  import { Types } from 'mongoose';
+  import { Request } from 'express'; 
   @Controller('products')
   export class ProductsController {
     constructor(private readonly productsService: ProductsService) {}
@@ -36,7 +37,11 @@ import {
         images: imageFilenames,
       });
     }
-  
+   @Get('search')
+  async search(@Query('keyword') keyword: string): Promise<Product[]> {
+    if (!keyword || keyword.trim() === '') return [];
+    return this.productsService.searchByName(keyword.trim());
+  }
     @Get()
     async findAll(): Promise<Product[]> {
       return this.productsService.findAll();
@@ -56,17 +61,5 @@ import {
 }
 
   
-    // @Put(':id')
-    // async update(
-    //   @Param('id') id: string,
-    //   @Body() updateData: Partial<CreateProductDto>,
-    // ): Promise<Product> {
-    //   return this.productsService.update(id, updateData);
-    // }
-  
-    // @Delete(':id')
-    // async remove(@Param('id') id: string): Promise<void> {
-    //   return this.productsService.remove(id);
-    // }
-  }
+}
   

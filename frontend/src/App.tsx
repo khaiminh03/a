@@ -12,8 +12,10 @@ import Cart from "./pages/Cart";
 import Navbar from "./components/Nabar";
 import MyOrders from "./pages/MyOrders";
 import ProductsByCategory from "./components/ProductByCategory"
-
-
+import SellerLayout from "./pages/SellerLayout"
+import ProductsPage from "./pages/ProductsPage";
+import AllProducts from "./components/AllProducts";
+import SearchPage from "./components/SearchPage";
 interface DecodedToken {
   id: string;
   role: string;
@@ -38,7 +40,7 @@ const App: React.FC = () => {
 
       try {
         const decodedToken = jwtDecode<DecodedToken>(token);
-        localStorage.setItem("user_info", JSON.stringify(decodedToken)); // ✅ Lưu thông tin người dùng
+        localStorage.setItem("user_info", JSON.stringify(decodedToken)); 
         setUser(decodedToken);
       } catch (err) {
         console.error("Không thể giải mã token:", err);
@@ -48,7 +50,7 @@ const App: React.FC = () => {
       if (storedToken) {
         try {
           const decodedToken = jwtDecode<DecodedToken>(storedToken);
-          localStorage.setItem("user_info", JSON.stringify(decodedToken)); // ✅ Cập nhật thông tin nếu cần
+          localStorage.setItem("user_info", JSON.stringify(decodedToken)); 
           setUser(decodedToken);
         } catch (err) {
           console.error("Không thể giải mã token từ localStorage:", err);
@@ -68,26 +70,37 @@ const App: React.FC = () => {
   }, [user, navigate, location.pathname]);
 
   return (
-    <div>
-      <Navbar/>
-      <div className="px-6 md:px-16 lg:px-24 xl:px-32">
-        <Routes>
-          <Route path="/" element={<Home />} />
-          <Route path="/add" element={<CategoryPage />} />
-          <Route path="/sp" element={<AddProduct />} />
-          <Route path="/dangky" element={<RegisterForm />} />
-          <Route path="/login" element={<LoginForm />} />
-          <Route path="/product/:id" element={<ProductDetail />} />
-          <Route path="/cart" element={<Cart />} />
-          <Route path="/myorder" element={<MyOrders/>} />
-          <Route path="/products/category/:categoryId" element={<ProductsByCategory />} />
+  <div>
+    {/* Chỉ hiển thị Navbar nếu không phải trang seller */}
+    {!location.pathname.startsWith("/seller") && <Navbar />}
 
-       
-        </Routes>
-      </div>
-      <Footer />
+    <div className="px-6 md:px-16 lg:px-24 xl:px-32">
+      <Routes>
+        {/* Các route bình thường */}
+        <Route path="/" element={<Home />} />
+        <Route path="/add" element={<CategoryPage />} />
+        <Route path="/sp" element={<AddProduct />} />
+        <Route path="/dangky" element={<RegisterForm />} />
+        <Route path="/login" element={<LoginForm />} />
+        <Route path="/product/:id" element={<ProductDetail />} />
+        <Route path="/cart" element={<Cart />} />
+        <Route path="/myorder" element={<MyOrders />} />
+        <Route path="/products/category/:categoryId" element={<ProductsByCategory />} />
+        <Route path="/spall" element={<AllProducts />} />
+        <Route path="/search" element={<SearchPage />} />
+        {/* Seller Layout dùng nested route */}
+        <Route path="/seller" element={<SellerLayout />}>
+          <Route index element={<AddProduct />} />
+          <Route path="add-product" element={<AddProduct />} />
+          <Route path="overview" element={<ProductsPage />} />
+          
+        </Route>
+      </Routes>
     </div>
-  );
-};
 
+    <Footer />
+  </div>
+);
+
+};
 export default App;

@@ -86,7 +86,16 @@ export class AuthService {
       },
     };
   }
-
+// Phương thức xác thực JWT và trả về thông tin người dùng
+  verifyToken(token: string) {
+    try {
+      // Giải mã token và trả về payload
+      const decoded = this.jwtService.verify(token);  // Token sẽ được giải mã và trả về payload
+      return decoded;  // Trả về thông tin người dùng giải mã từ token
+    } catch (error) {
+      throw new Error('Token verification failed');
+    }
+  }
   // Xác thực thông tin người dùng qua Google
 // async validateGoogleUser(googleUser: any, accessToken: string): Promise<UserDocument> {
 //     const googleUserInfo = await this.getGoogleUserInfo(accessToken);

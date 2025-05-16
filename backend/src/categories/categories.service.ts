@@ -41,4 +41,7 @@ export class CategoriesService {
       throw new NotFoundException(`Category with id ${id} not found`);
     }
   }
+   async findCategoryById(categoryId: string): Promise<Category | null> {
+    return this.categoryModel.findById(categoryId).exec();
+  }
 }

@@ -20,7 +20,7 @@ const Cart = () => {
   }, []);
 
   const totalPrice = products.reduce((acc, item) => acc + item.price * item.quantity, 0);
-  const tax = totalPrice * 0.02;
+  const tax = totalPrice * 0.0;
   const totalWithTax = totalPrice + tax;
 
   const updateQuantity = (index: number, newQty: number) => {
@@ -52,7 +52,7 @@ const Cart = () => {
 
     const userId = userInfo._id || userInfo.sub;
     if (!userId) {
-      alert("User information is incomplete or missing.");
+      alert("Thông tin người dùng chưa đầy đủ hoặc bị thiếu.");
       return;
     }
 
@@ -65,8 +65,8 @@ const Cart = () => {
       })),
       totalAmount: totalWithTax,
       shippingAddress: address,
-      paymentMethod: "COD",
-      status: "pending",
+      paymentMethod: "Thanh toán khi nhận hàng",
+      status: "Chờ",
     };
 
     try {
@@ -82,11 +82,11 @@ const Cart = () => {
         localStorage.removeItem("cart");
         navigate("/myorder");
       } else {
-        alert("Order placement failed!");
+        alert("Đặt hàng không thành công!");
       }
     } catch (error) {
-      console.error("Error placing order:", error);
-      alert("Order placement failed!");
+      console.error("Lỗi khi đặt hàng:", error);
+      alert("Đặt hàng không thành công!");
     }
   };
 
@@ -94,13 +94,13 @@ const Cart = () => {
     <div className="flex flex-col md:flex-row py-16 max-w-6xl w-full px-6 mx-auto">
       <div className="flex-1 max-w-4xl">
         <h1 className="text-3xl font-medium mb-6">
-          Giỏ hàng <span className="text-sm text-indigo-500">{products.length} số lượng</span>
+          Giỏ hàng <span className="text-sm text-indigo-500">{products.length} sản phẩm</span>
         </h1>
 
         <div className="grid grid-cols-[2fr_1fr_1fr] text-gray-500 text-base font-medium pb-3">
           <p className="text-left">Thông tin chi tiết</p>
-          <p className="text-center">Tổng</p>
-          <p className="text-center">Action</p>
+          <p className="text-center">Tổng tiền</p>
+          <p className="text-center">Hủy</p>
         </div>
 
         {products.map((product, index) => (
@@ -154,18 +154,18 @@ const Cart = () => {
       </div>
 
       <div className="max-w-[360px] w-full bg-gray-100/40 p-5 max-md:mt-16 border border-gray-300/70">
-        <h2 className="text-xl font-medium">Order Summary</h2>
+        <h2 className="text-xl font-medium">Thông tin đơn hàng</h2>
         <hr className="border-gray-300 my-5" />
 
         <div className="mb-6">
-          <p className="text-sm font-medium uppercase">Delivery Address</p>
+          <p className="text-sm font-medium uppercase">Địa chỉ giao hàng</p>
           <div className="relative flex justify-between items-start mt-2">
             <p className="text-gray-500">{address}</p>
             <button
               onClick={() => setShowAddress(!showAddress)}
               className="text-indigo-500 hover:underline cursor-pointer"
             >
-              Change
+              Thay đổi
             </button>
             {showAddress && (
               <div className="absolute top-12 py-1 bg-white border border-gray-300 text-sm w-full z-10">
@@ -180,16 +180,16 @@ const Cart = () => {
                   onClick={() => updateAddress(address)}
                   className="w-full text-indigo-500 text-center p-2 hover:bg-indigo-500/10"
                 >
-                  Save Address
+                  Lưu
                 </button>
               </div>
             )}
           </div>
 
-          <p className="text-sm font-medium uppercase mt-6">Payment Method</p>
+          <p className="text-sm font-medium uppercase mt-6">Phương thức thanh toán</p>
           <select className="w-full border border-gray-300 bg-white px-3 py-2 mt-2 outline-none">
-            <option value="COD">Cash On Delivery</option>
-            <option value="Online">Online Payment</option>
+            <option value="COD">Tiền mặt khi nhận hàng</option>
+            <option value="Online">Thanh toán trực tuyến</option>
           </select>
         </div>
 
@@ -197,19 +197,19 @@ const Cart = () => {
 
         <div className="text-gray-500 mt-4 space-y-2">
           <p className="flex justify-between">
-            <span>Price</span>
+            <span>Giá</span>
             <span>{totalPrice.toLocaleString()}₫</span>
           </p>
           <p className="flex justify-between">
-            <span>Shipping Fee</span>
-            <span className="text-green-600">Free</span>
+            <span>Phí vận chuyển</span>
+            <span className="text-green-600">Miễn phí</span>
           </p>
-          <p className="flex justify-between">
-            <span>Tax (2%)</span>
+          {/* <p className="flex justify-between">
+            <span>Thuế(2%)</span>
             <span>{tax.toLocaleString()}₫</span>
-          </p>
+          </p> */}
           <p className="flex justify-between text-lg font-medium mt-3">
-            <span>Total Amount:</span>
+            <span>Tổng tiền:</span>
             <span>{totalWithTax.toLocaleString()}₫</span>
           </p>
         </div>
