@@ -19,5 +19,5 @@ export class GoogleUserDto {
 
   @IsOptional()
   @IsString()
-  password?: string; // Trường này có thể không cần nếu bạn không bao giờ lưu mật khẩu cho Google user
+  password?: string; 
 }

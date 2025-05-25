@@ -1,9 +1,20 @@
-import { IsNotEmpty, IsNumber, IsOptional, IsString, IsArray } from 'class-validator';
+import {
+  IsNotEmpty,
+  IsNumber,
+  IsOptional,
+  IsString,
+  IsArray,
+  IsEnum,
+} from 'class-validator';
 
 export class CreateProductDto {
   @IsNotEmpty()
   @IsString()
   name: string;
+
+  @IsOptional()
+  @IsString()
+  slug?: string;
 
   @IsOptional()
   @IsString()
@@ -15,16 +26,31 @@ export class CreateProductDto {
 
   @IsNotEmpty()
   @IsNumber()
+  quantity: number;
+
+  @IsNotEmpty()
+  @IsString()
+  unitType: string;
+
+  @IsNotEmpty()
+  @IsString()
+  unitDisplay: string;
+
+  @IsNotEmpty()
+  @IsNumber()
   stock: number;
 
   @IsOptional()
   @IsArray()
+  @IsString({ each: true })
   images?: string[];
 
   @IsNotEmpty()
+  @IsString()
   categoryId: string;
 
   @IsNotEmpty()
+  @IsString()
   supplierId: string;
 
   @IsOptional()
@@ -32,6 +58,9 @@ export class CreateProductDto {
   origin?: string;
 
   @IsOptional()
-  @IsString()
-  status?: 'pending' | 'approved' | 'rejected';
+  @IsEnum(['pending', 'approved', 'rejected', 'out_of_stock'])
+  status?: 'pending' | 'approved' | 'rejected' | 'out_of_stock';
+
+  @IsOptional()
+  isActive?: boolean;
 }

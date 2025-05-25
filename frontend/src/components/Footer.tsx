@@ -1,11 +1,11 @@
 const Footer = () => {
     const linkSections = [
         {
-            title: "Quick Links",
-            links: ["Home", "Best Sellers", "Offers & Deals", "Contact Us", "FAQs"]
+            title: "Liên kết nhanh",
+            links: ["Trang chủ", "Bán chạy", "Offers & Deals", "Contact Us", "FAQs"]
         },
         {
-            title: "Need Help?",
+            title: "Cần trợ giúp?",
             links: ["Delivery Information", "Return & Refund Policy", "Payment Methods", "Track your Order", "Contact Us"]
         },
         {

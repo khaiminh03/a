@@ -1,9 +1,10 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { assets } from "../assets/assets";
 
 const Cart = () => {
   const [products, setProducts] = useState<any[]>([]);
-  const [address, setAddress] = useState("No address found");
+  const [address, setAddress] = useState("");
   const [showAddress, setShowAddress] = useState(false);
   const navigate = useNavigate();
 
@@ -14,14 +15,14 @@ const Cart = () => {
     const rawUser = JSON.parse(localStorage.getItem("user_info") || "{}");
     const userInfo = Array.isArray(rawUser) ? rawUser[0] : rawUser;
 
-    if (userInfo?.address) {
+    if (userInfo?.address && userInfo.address !== "No address found") {
       setAddress(userInfo.address);
     }
   }, []);
 
+  const totalQuantity = products.reduce((acc, item) => acc + item.quantity, 0);
   const totalPrice = products.reduce((acc, item) => acc + item.price * item.quantity, 0);
-  const tax = totalPrice * 0.0;
-  const totalWithTax = totalPrice + tax;
+  const totalWithTax = totalPrice;
 
   const updateQuantity = (index: number, newQty: number) => {
     const updatedProducts = [...products];
@@ -36,21 +37,60 @@ const Cart = () => {
     localStorage.setItem("cart", JSON.stringify(updatedProducts));
   };
 
-  const updateAddress = (newAddress: string) => {
-    const rawUser = JSON.parse(localStorage.getItem("user_info") || "{}");
-    const userInfo = Array.isArray(rawUser) ? rawUser[0] : rawUser;
+  const updateAddress = async (newAddress: string) => {
+    if (newAddress.trim() === "") {
+      alert("Địa chỉ không được để trống");
+      return;
+    }
 
-    userInfo.address = newAddress;
-    localStorage.setItem("user_info", JSON.stringify(userInfo));
-    setAddress(newAddress);
-    setShowAddress(false);
+    try {
+      const rawUser = JSON.parse(localStorage.getItem("user_info") || "{}");
+      const userInfo = Array.isArray(rawUser) ? rawUser[0] : rawUser;
+      const userId = userInfo._id || userInfo.sub;
+
+      if (!userId) {
+        alert("Không tìm thấy thông tin người dùng");
+        return;
+      }
+
+      const response = await fetch(`http://localhost:5000/users/${userId}`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          // Nếu backend cần token: Authorization: `Bearer ${localStorage.getItem("accessToken")}`
+        },
+        body: JSON.stringify({ address: newAddress }),
+      });
+
+      if (!response.ok) {
+        alert("Cập nhật địa chỉ thất bại");
+        return;
+      }
+
+      userInfo.address = newAddress;
+      localStorage.setItem("user_info", JSON.stringify(userInfo));
+      setAddress(newAddress);
+      setShowAddress(false);
+    } catch (error) {
+      console.error("Lỗi cập nhật địa chỉ:", error);
+      alert("Cập nhật địa chỉ thất bại");
+    }
   };
 
   const placeOrder = async () => {
+    if (products.length === 0) {
+      alert("Giỏ hàng trống, vui lòng chọn sản phẩm trước khi đặt hàng.");
+      return;
+    }
+    if (!address || address.trim() === "") {
+      alert("Vui lòng nhập địa chỉ giao hàng hợp lệ.");
+      return;
+    }
+
     const rawUser = JSON.parse(localStorage.getItem("user_info") || "{}");
     const userInfo = Array.isArray(rawUser) ? rawUser[0] : rawUser;
-
     const userId = userInfo._id || userInfo.sub;
+
     if (!userId) {
       alert("Thông tin người dùng chưa đầy đủ hoặc bị thiếu.");
       return;
@@ -58,15 +98,16 @@ const Cart = () => {
 
     const orderData = {
       customerId: userId,
-      items: products.map(product => ({
+      items: products.map((product) => ({
         productId: product._id,
+        supplierId: product.supplierId,
         quantity: product.quantity,
         price: product.price,
       })),
       totalAmount: totalWithTax,
       shippingAddress: address,
       paymentMethod: "Thanh toán khi nhận hàng",
-      status: "Chờ",
+      status: "Đã đặt hàng",
     };
 
     try {
@@ -94,11 +135,11 @@ const Cart = () => {
     <div className="flex flex-col md:flex-row py-16 max-w-6xl w-full px-6 mx-auto">
       <div className="flex-1 max-w-4xl">
         <h1 className="text-3xl font-medium mb-6">
-          Giỏ hàng <span className="text-sm text-indigo-500">{products.length} sản phẩm</span>
+          Giỏ hàng <span className="text-sm text-green-500">{totalQuantity} sản phẩm</span>
         </h1>
 
         <div className="grid grid-cols-[2fr_1fr_1fr] text-gray-500 text-base font-medium pb-3">
-          <p className="text-left">Thông tin chi tiết</p>
+          <p className="text-left">Thông tin chi tiết sản phẩm</p>
           <p className="text-center">Tổng tiền</p>
           <p className="text-center">Hủy</p>
         </div>
@@ -119,25 +160,28 @@ const Cart = () => {
               <div>
                 <p className="hidden md:block font-semibold">{product.name}</p>
                 <div className="font-normal text-gray-500/70">
-                  <p>Size: <span>{product.size || "N/A"}</span></p>
+                  <p>
+                    Đóng gói: <span>{product.unitDisplay || "Không rõ"}</span>
+                  </p>
                   <div className="flex items-center">
-                    <p>Qty:</p>
+                    <p>Số lượng:</p>
                     <select
                       className="outline-none ml-2"
                       value={product.quantity}
                       onChange={(e) => updateQuantity(index, parseInt(e.target.value))}
                     >
                       {[...Array(10)].map((_, i) => (
-                        <option key={i} value={i + 1}>{i + 1}</option>
+                        <option key={i} value={i + 1}>
+                          {i + 1}
+                        </option>
                       ))}
                     </select>
                   </div>
                 </div>
               </div>
             </div>
-            <p className="text-center">
-              {(product.price * product.quantity).toLocaleString()}₫
-            </p>
+
+            <p className="text-center">{(product.price * product.quantity).toLocaleString()}₫</p>
             <button className="cursor-pointer mx-auto" onClick={() => removeProduct(index)}>
               <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
                 <path
@@ -151,8 +195,16 @@ const Cart = () => {
             </button>
           </div>
         ))}
+        <button
+          onClick={() => {
+            navigate("/products");
+          }}
+          className="group cursor-pointer flex items-center mt-8 gap-2 text-green-500 font-medium"
+        >
+          <img src={assets.arrow_right_icon_colored} alt="arrow" />
+          Tiếp tục mua sắm
+        </button>
       </div>
-
       <div className="max-w-[360px] w-full bg-gray-100/40 p-5 max-md:mt-16 border border-gray-300/70">
         <h2 className="text-xl font-medium">Thông tin đơn hàng</h2>
         <hr className="border-gray-300 my-5" />
@@ -160,10 +212,10 @@ const Cart = () => {
         <div className="mb-6">
           <p className="text-sm font-medium uppercase">Địa chỉ giao hàng</p>
           <div className="relative flex justify-between items-start mt-2">
-            <p className="text-gray-500">{address}</p>
+            <p className="text-gray-500">{address || "Chưa có địa chỉ"}</p>
             <button
               onClick={() => setShowAddress(!showAddress)}
-              className="text-indigo-500 hover:underline cursor-pointer"
+              className="text-green-500 hover:underline cursor-pointer"
             >
               Thay đổi
             </button>
@@ -171,7 +223,7 @@ const Cart = () => {
               <div className="absolute top-12 py-1 bg-white border border-gray-300 text-sm w-full z-10">
                 <input
                   type="text"
-                  placeholder="Enter address"
+                  placeholder="Nhập địa chỉ"
                   className="w-full p-2 border-b outline-none"
                   onChange={(e) => setAddress(e.target.value)}
                   value={address}
@@ -204,10 +256,6 @@ const Cart = () => {
             <span>Phí vận chuyển</span>
             <span className="text-green-600">Miễn phí</span>
           </p>
-          {/* <p className="flex justify-between">
-            <span>Thuế(2%)</span>
-            <span>{tax.toLocaleString()}₫</span>
-          </p> */}
           <p className="flex justify-between text-lg font-medium mt-3">
             <span>Tổng tiền:</span>
             <span>{totalWithTax.toLocaleString()}₫</span>
@@ -215,7 +263,7 @@ const Cart = () => {
         </div>
 
         <button
-          className="w-full py-3 mt-6 cursor-pointer bg-indigo-500 text-white font-medium hover:bg-indigo-400 transition-colors"
+          className="w-full py-3 mt-6 cursor-pointer bg-green-500 text-white font-medium hover:bg-green-400 transition rounded"
           onClick={placeOrder}
         >
           Thanh toán

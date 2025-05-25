@@ -21,12 +21,14 @@ export class GoogleStrategy extends PassportStrategy(Strategy) {
     });
   }
 
- async validate(accessToken: string, refreshToken: string, profile: any, done: VerifyCallback) {
+  async validate(accessToken: string, refreshToken: string, profile: any, done: VerifyCallback) {
     try {
       const email = profile.emails?.[0]?.value;
       const avatarUrl = profile.photos?.[0]?.value;
 
-      if (!email || !avatarUrl) throw new Error('Required Google profile fields are missing');
+      if (!email || !avatarUrl) {
+        throw new Error('Required Google profile fields are missing');
+      }
 
       const googleUser = {
         email,
@@ -36,21 +38,26 @@ export class GoogleStrategy extends PassportStrategy(Strategy) {
         password: '',
       };
 
+      // Lấy hoặc tạo user, đồng thời set isGoogleAccount = true trong validateGoogleUser
       const user = await this.authService.validateGoogleUser(googleUser, accessToken);
       const userDocument = user as UserDocument;
 
-      const token = this.authService.getAccessToken({
+      // Tạo payload JWT với trường isGoogleAccount = true
+      const payload = {
         email: userDocument.email,
         sub: userDocument._id.toString(),
         role: userDocument.role,
-      });
+        avatarUrl: userDocument.avatarUrl || '',
+        isGoogleAccount: true,  // Thêm trường này để frontend nhận diện
+      };
+
+      const token = this.authService.getAccessToken(payload);
 
       done(null, {
         user: {
           id: userDocument._id.toString(),
           name: userDocument.name,
           email: userDocument.email,
-          avatarUrl: userDocument.avatarUrl,
           role: userDocument.role,
         },
         access_token: token,

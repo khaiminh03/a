@@ -1,4 +1,4 @@
-import { IsEmail, IsEnum, IsNotEmpty, IsOptional, IsString } from 'class-validator';
+import { IsEmail, IsEnum, IsNotEmpty, IsOptional, IsString, IsBoolean } from 'class-validator';
 
 export class CreateUserDto {
   @IsNotEmpty()
@@ -23,7 +23,7 @@ export class CreateUserDto {
 
   @IsOptional()
   @IsEnum(['customer', 'supplier', 'admin'])
-  role?: 'customer' | 'supplier' | 'admin'; // Chỉnh kiểu role về string literal
+  role?: 'customer' | 'supplier' | 'admin';
 
   @IsOptional()
   @IsString()
@@ -37,4 +37,7 @@ export class CreateUserDto {
   @IsString()
   avatarUrl?: string;
 
+  @IsOptional()
+  @IsBoolean()
+  isGoogleAccount?: boolean;  // <-- Thêm trường này
 }

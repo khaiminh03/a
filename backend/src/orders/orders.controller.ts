@@ -1,4 +1,4 @@
-import { Controller, Post, Body, Get, Param } from '@nestjs/common';
+import { Controller, Post, Body, Get, Param, HttpException, HttpStatus } from '@nestjs/common';
 import { OrdersService } from './orders.service';
 import { CreateOrderDto } from './dto/create-order.dto';
 
@@ -6,20 +6,34 @@ import { CreateOrderDto } from './dto/create-order.dto';
 export class OrdersController {
   constructor(private readonly ordersService: OrdersService) {}
 
-  // POST /orders - Tạo đơn hàng mới
   @Post()
   async create(@Body() createOrderDto: CreateOrderDto) {
-    return await this.ordersService.create(createOrderDto);
+    try {
+      return await this.ordersService.create(createOrderDto);
+    } catch (error) {
+      throw new HttpException(error.message, HttpStatus.BAD_REQUEST);
+    }
   }
 
-  // GET /orders - Lấy tất cả đơn hàng kèm tên sản phẩm và tên danh mục
   @Get()
   async getAll() {
-    return await this.ordersService.getOrdersWithProductDetails();
+    try {
+      return await this.ordersService.getOrdersWithProductDetails();
+    } catch (error) {
+      throw new HttpException(error.message, HttpStatus.INTERNAL_SERVER_ERROR);
+    }
   }
-   // GET /orders/customer/:id - Lấy đơn hàng theo customerId
+
   @Get('customer/:id')
   async getByCustomer(@Param('id') customerId: string) {
-    return await this.ordersService.getOrdersByCustomerId(customerId);
+    try {
+      return await this.ordersService.getOrdersByCustomerId(customerId);
+    } catch (error) {
+      throw new HttpException(error.message, HttpStatus.INTERNAL_SERVER_ERROR);
+    }
   }
+  @Get('supplier/:id')
+async getOrdersBySupplier(@Param('id') supplierId: string) {
+  return this.ordersService.getOrdersBySupplierId(supplierId);
+}
 }

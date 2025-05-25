@@ -8,7 +8,7 @@ import { ProductsModule } from './products/products.module'
 import { AuthModule } from './auth/auth.module';
 import googleOAuthConfig from './auth/config/google-oauth.config';
 import { OrdersModule } from './orders/orders.module';
-
+import { StoreProfileModule } from './store-profile/store-profile.module';
 @Module({
   imports: [
       ConfigModule.forRoot({
@@ -21,6 +21,7 @@ import { OrdersModule } from './orders/orders.module';
     ProductsModule,
     AuthModule,
     OrdersModule,
+    StoreProfileModule,
   ],
   controllers: [AppController],
   providers: [AppService],

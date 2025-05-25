@@ -8,19 +8,24 @@ export default function RegisterForm() {
     password: "",
     phone: "",
     address: "",
-    role: "customer", // 👈 Thêm role mặc định
   });
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+  const handleChange = (
+    e: React.ChangeEvent<HTMLInputElement>
+  ) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      const response = await axios.post('http://localhost:5000/auth/register', formData);
+      const response = await axios.post(
+        "http://localhost:5000/auth/register",
+        formData
+      );
       console.log("Register success:", response.data);
       alert("Đăng ký thành công!");
+      // Có thể reset form hoặc chuyển hướng sau đăng ký
     } catch (error: any) {
       console.error(error.response?.data || error.message);
       alert("Đăng ký thất bại!");
@@ -57,6 +62,7 @@ export default function RegisterForm() {
           onChange={handleChange}
           className="w-full border rounded-xl p-3"
           required
+          minLength={6}
         />
         <input
           type="text"
@@ -76,19 +82,6 @@ export default function RegisterForm() {
           className="w-full border rounded-xl p-3"
           required
         />
-        
-        {/* Thêm select chọn role nè */}
-        <select
-          name="role"
-          value={formData.role}
-          onChange={handleChange}
-          className="w-full border rounded-xl p-3"
-          required
-        >
-          <option value="customer">Khách hàng</option>
-          <option value="supplier">Nhà cung cấp</option>
-          <option value="admin">Quản trị viên</option>
-        </select>
 
         <button
           type="submit"

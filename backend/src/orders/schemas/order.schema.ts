@@ -3,13 +3,16 @@ import { Document, Types } from 'mongoose';
 
 @Schema({ _id: false })
 export class OrderItem {
-  @Prop({ type: Types.ObjectId, ref: 'Product' })
+  @Prop({ type: Types.ObjectId, ref: 'Product', required: true })
   productId: Types.ObjectId;
 
-  @Prop()
+  @Prop({ type: Types.ObjectId, ref: 'User', required: true }) // supplier của sản phẩm
+  supplierId: Types.ObjectId;
+
+  @Prop({ required: true })
   quantity: number;
 
-  @Prop()
+  @Prop({ required: true })
   price: number;
 }
 
@@ -17,27 +20,26 @@ export const OrderItemSchema = SchemaFactory.createForClass(OrderItem);
 
 @Schema({ timestamps: true })
 export class Order {
-  @Prop({ type: Types.ObjectId, ref: 'User' })
+  @Prop({ type: Types.ObjectId, ref: 'User', required: true })
   customerId: Types.ObjectId;
-  
-  @Prop({ type: Types.ObjectId, ref: 'Product' })
-  productId: Types.ObjectId;
 
-
-  @Prop({ type: [OrderItemSchema] })
+  @Prop({ type: [OrderItemSchema], required: true })
   items: OrderItem[];
 
-  @Prop()
+  @Prop({ required: true })
   totalAmount: number;
 
-  @Prop()
+  @Prop({ required: true })
   shippingAddress: string;
 
-  @Prop()
+  @Prop({ required: true })
   paymentMethod: string;
 
-  @Prop()
+  @Prop({ default: 'Đã đặt hàng' })
   status: string;
+
+  @Prop({ default: false })
+  isPaid: boolean;
 }
 
 export type OrderDocument = Order & Document;

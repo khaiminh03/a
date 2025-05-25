@@ -5,11 +5,9 @@ import App from './App';
 import { AppContextProvider } from './context/AppContextProvider';
 import './index.css';
 createRoot(document.getElementById('root')!).render(
-  <BrowserRouter>
-  <AppContextProvider>
-
-    <App />
-
-  </AppContextProvider>
-  </BrowserRouter>,
-)
+   <BrowserRouter>
+    <AppContextProvider>
+      <App />
+    </AppContextProvider>
+  </BrowserRouter>
+);

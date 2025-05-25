@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { User, UserDocument } from './schemas/user.schema'
@@ -37,6 +37,7 @@ export class UserService {
     }
     return updatedUser;
   }
+  
 
   async remove(id: string): Promise<User> {
     const user = await this.userModel.findByIdAndDelete(id).select('-password').exec();
@@ -53,6 +54,42 @@ export class UserService {
   async findById(id: string): Promise<UserDocument | null> {
     return this.userModel.findById(id).exec();
   }
+
+  //
+  async upgradeToSupplier(userId: string, phone: string, address: string): Promise<UserDocument> {
+  if (!phone || !address) {
+    throw new BadRequestException('Phone và address là bắt buộc để nâng cấp nhà cung cấp');
+  }
+
+  const updatedUser = await this.userModel.findByIdAndUpdate(
+    userId,
+    { role: 'supplier', phone, address },
+    { new: true }
+  );
+
+  if (!updatedUser) {
+    throw new NotFoundException('User không tồn tại');
+  }
+
+  return updatedUser;
+}
+async becomeSupplier(userId: string, phone: string, address: string): Promise<UserDocument> {
+  if (!phone || !address) {
+    throw new BadRequestException('Phone và address là bắt buộc để trở thành nhà cung cấp');
+  }
+
+  const updatedUser = await this.userModel.findByIdAndUpdate(
+    userId,
+    { role: 'supplier', phone, address },
+    { new: true }
+  );
+
+  if (!updatedUser) {
+    throw new NotFoundException('User không tồn tại');
+  }
+
+  return updatedUser;
+}
   
 }
 

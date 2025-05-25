@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-
+import { toast } from 'react-toastify';
 interface ProductCardProps {
   product: {
     _id: string;
@@ -39,8 +39,8 @@ const ProductCard = ({ product }: ProductCardProps) => {
       cart.push({ ...product, quantity: 1 });  // Thêm sản phẩm với số lượng 1
     }
 
-    localStorage.setItem("cart", JSON.stringify(cart));  // Lưu giỏ hàng đã cập nhật
-    console.log(`Đã thêm: ${product.name}`);
+    localStorage.setItem("cart", JSON.stringify(cart));
+    toast.success(`Đã thêm "${product.name}" vào giỏ hàng!`);  // Lưu giỏ hàng đã cập nhật
   };
 
  const formatPrice = (price: number): string => {
