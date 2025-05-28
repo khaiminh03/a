@@ -23,12 +23,23 @@ export default function RegisterForm() {
         "http://localhost:5000/auth/register",
         formData
       );
-      console.log("Register success:", response.data);
+      console.log("Đăng ký thành công:", response.data);
       alert("Đăng ký thành công!");
-      // Có thể reset form hoặc chuyển hướng sau đăng ký
+
+      // ✅ Reset form sau khi đăng ký
+      setFormData({
+        name: "",
+        email: "",
+        password: "",
+        phone: "",
+        address: "",
+      });
     } catch (error: any) {
-      console.error(error.response?.data || error.message);
-      alert("Đăng ký thất bại!");
+      const errorMessage =
+        error.response?.data?.message || error.response?.data || error.message;
+
+      console.error("Lỗi đăng ký:", errorMessage);
+      alert(`Đăng ký thất bại: ${errorMessage}`);
     }
   };
 

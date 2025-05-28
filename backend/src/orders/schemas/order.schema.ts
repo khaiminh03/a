@@ -14,6 +14,10 @@ export class OrderItem {
 
   @Prop({ required: true })
   price: number;
+  
+   @Prop({ default: false }) // ✅ Thêm đúng tại đây
+  isReviewed?: boolean;
+  
 }
 
 export const OrderItemSchema = SchemaFactory.createForClass(OrderItem);
@@ -40,6 +44,10 @@ export class Order {
 
   @Prop({ default: false })
   isPaid: boolean;
+
+  @Prop({ default: false }) // <-- Thêm dòng này
+  isReviewed?: boolean;
+  
 }
 
 export type OrderDocument = Order & Document;

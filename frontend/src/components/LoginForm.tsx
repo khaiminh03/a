@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from "react";
 import axios from "axios";
-import { useNavigate } from "react-router-dom";
 import jwtDecode from "jwt-decode";
 
 interface DecodedToken {
@@ -18,11 +17,14 @@ interface LoginResponse {
   access_token: string;
 }
 
-const LoginForm: React.FC = () => {
+interface LoginFormProps {
+  onSuccess?: () => void;
+}
+
+const LoginForm: React.FC<LoginFormProps> = ({ onSuccess }) => {
   const [email, setEmail] = useState<string>("");
   const [password, setPassword] = useState<string>("");
   const [error, setError] = useState<string>("");
-  const navigate = useNavigate();
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -34,28 +36,17 @@ const LoginForm: React.FC = () => {
         const decoded = jwtDecode<DecodedToken>(token);
         localStorage.setItem("user_info", JSON.stringify(decoded));
 
-        // Phát event storage cho các tab khác
         window.dispatchEvent(new Event("storage"));
-
-        // Phát event custom cho tab hiện tại cập nhật UI
         window.dispatchEvent(new CustomEvent("authChanged"));
 
-        // Xóa query string token khỏi URL
         window.history.replaceState({}, "", window.location.pathname);
 
-        // Chuyển hướng theo role
-        if (decoded.role === "admin") {
-          navigate("/admin");
-        } else if (decoded.role === "supplier") {
-          navigate("/seller");
-        } else {
-          navigate("/");
-        }
+        if (onSuccess) onSuccess();
       } catch (err) {
         console.error("Giải mã token thất bại:", err);
       }
     }
-  }, [navigate]);
+  }, [onSuccess]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -71,20 +62,10 @@ const LoginForm: React.FC = () => {
       const decoded = jwtDecode<DecodedToken>(token);
       localStorage.setItem("user_info", JSON.stringify(decoded));
 
-      // Phát event storage cho các tab khác
       window.dispatchEvent(new Event("storage"));
-
-      // Phát event custom cho tab hiện tại cập nhật UI
       window.dispatchEvent(new CustomEvent("authChanged"));
 
-      // Chuyển hướng theo role
-      if (decoded.role === "admin") {
-        navigate("/admin");
-      } else if (decoded.role === "supplier") {
-        navigate("/seller");
-      } else {
-        navigate("/");
-      }
+      if (onSuccess) onSuccess();
     } catch (err) {
       setError("Email hoặc mật khẩu không đúng");
     }
@@ -95,46 +76,82 @@ const LoginForm: React.FC = () => {
   };
 
   return (
-    <div className="flex items-center justify-center min-h-screen bg-gray-100">
-      <div className="bg-white text-gray-500 max-w-[340px] w-full mx-4 md:p-6 p-4 py-8 text-left text-sm rounded-lg shadow-[0px_0px_10px_0px] shadow-black/10">
+    // Background mờ full màn hình, căn giữa nội dung
+    <div className="fixed inset-0 z-30 flex items-center justify-center bg-black/50 bg-opacity-30">
+      {/* Container form */}
+      <div className="bg-white max-w-md w-full mx-4 p-8 rounded-lg shadow-lg">
         <form onSubmit={handleSubmit}>
-          <h2 className="text-2xl font-bold mb-9 text-center text-gray-800">Đăng nhập</h2>
-          {error && <div className="text-red-500 text-center mb-4">{error}</div>}
+          <h2 className="text-center text-3xl font-extrabold mb-8 text-gray-900">
+            <span className="text-green-600">User</span> Login
+          </h2>
+          {error && (
+            <div className="text-red-600 text-center mb-6 font-semibold">{error}</div>
+          )}
 
-          <div className="flex items-center my-2 border bg-indigo-500/5 border-gray-500/10 rounded gap-1 pl-2">
+          <div className="mb-6">
             <input
-              className="w-full outline-none bg-transparent py-2.5"
               type="email"
               placeholder="Email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               required
+              autoFocus
+              className="w-full rounded-md px-4 py-3 border border-gray-300 bg-green-50 focus:outline-none focus:ring-2 focus:ring-green-500"
             />
           </div>
 
-          <div className="flex items-center mt-2 mb-8 border bg-indigo-500/5 border-gray-500/10 rounded gap-1 pl-2">
+          <div className="mb-8">
             <input
-              className="w-full outline-none bg-transparent py-2.5"
               type="password"
               placeholder="Mật khẩu"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               required
+              className="w-full rounded-md px-4 py-3 border border-gray-300 bg-green-50 focus:outline-none focus:ring-2 focus:ring-green-500"
             />
+          </div>
+
+          <div className="mb-6 text-center text-sm text-gray-600">
+            Create an account?{" "}
+            <a href="#" className="text-green-600 hover:underline font-semibold">
+              click here
+            </a>
           </div>
 
           <button
             type="submit"
-            className="w-full mb-3 bg-indigo-500 hover:bg-indigo-600 transition-all active:scale-95 py-2.5 rounded text-white font-medium"
+            className="w-full mb-4 py-3 rounded-md bg-green-600 text-white font-semibold shadow-md hover:bg-green-700 active:scale-95 transition-transform"
           >
-            Đăng nhập
+            Login
           </button>
 
           <button
             type="button"
             onClick={handleGoogleLogin}
-            className="w-full mb-3 border border-gray-300 text-gray-700 hover:bg-gray-100 transition-all active:scale-95 py-2.5 rounded font-medium flex items-center justify-center gap-2"
+            className="w-full py-3 rounded-md border border-gray-300 text-gray-800 flex justify-center items-center gap-3 hover:bg-gray-100 active:scale-95 transition-transform"
           >
+            <svg
+              className="w-5 h-5"
+              viewBox="0 0 533.5 544.3"
+              xmlns="http://www.w3.org/2000/svg"
+            >
+              <path
+                fill="#4285f4"
+                d="M533.5 278.4c0-18.4-1.5-36-4.5-53.2H272v100.7h147.3c-6.4 34.7-26 64.3-55.7 84v69h89.7c52.6-48.5 82.2-119.7 82.2-200.5z"
+              />
+              <path
+                fill="#34a853"
+                d="M272 544.3c73.7 0 135.7-24.5 180.9-66.3l-89.7-69c-24.9 16.8-56.8 26.8-91.2 26.8-69.9 0-129.3-47.2-150.5-110.9H29.6v69.7c45.5 89.6 139 150.7 242.4 150.7z"
+              />
+              <path
+                fill="#fbbc04"
+                d="M121.5 323.6c-10.4-31-10.4-64.3 0-95.3V158.6H29.6c-35.9 71.6-35.9 157.1 0 228.7l91.9-63.7z"
+              />
+              <path
+                fill="#ea4335"
+                d="M272 107.7c38.6 0 73.3 13.3 100.7 39.3l75.4-75.4C403.1 24.1 344.1 0 272 0 168.6 0 75.1 61.1 29.6 150.7l91.9 69.7c21.2-63.7 80.6-110.9 150.5-110.9z"
+              />
+            </svg>
             Đăng nhập với Google
           </button>
         </form>

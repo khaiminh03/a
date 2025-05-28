@@ -9,7 +9,6 @@ import CategoryPage from './pages/CategoryPage';
 import AddProduct from "./pages/AddProduct";
 import RegisterForm from "./pages/RegisterForm";
 import ProductDetail from "./pages/ProductDetail";
-import LoginForm from "./components/LoginForm";
 import Footer from "./components/Footer";
 import Cart from "./pages/Cart";
 import Navbar from "./components/Navbar";
@@ -36,7 +35,7 @@ const App: React.FC = () => {
           <Route path="/add" element={<CategoryPage />} />
           <Route path="/sp" element={<AddProduct />} />
           <Route path="/dangky" element={<RegisterForm />} />
-          <Route path="/login" element={<LoginForm />} />
+          
           <Route path="/product/:id" element={<ProductDetail />} />
           <Route path="/cart" element={<Cart />} />
           <Route path="/myorder" element={<MyOrders />} />

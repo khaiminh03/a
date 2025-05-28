@@ -8,13 +8,21 @@ const Cart = () => {
   const [showAddress, setShowAddress] = useState(false);
   const navigate = useNavigate();
 
+  const getUserInfo = () => {
+    const rawUser = JSON.parse(localStorage.getItem("user_info") || "{}");
+    const userInfo = Array.isArray(rawUser) ? rawUser[0] : rawUser;
+    if (userInfo.sub && !userInfo._id) {
+      userInfo._id = userInfo.sub;
+      localStorage.setItem("user_info", JSON.stringify(userInfo));
+    }
+    return userInfo;
+  };
+
   useEffect(() => {
     const cart = JSON.parse(localStorage.getItem("cart") || "[]");
     setProducts(cart);
 
-    const rawUser = JSON.parse(localStorage.getItem("user_info") || "{}");
-    const userInfo = Array.isArray(rawUser) ? rawUser[0] : rawUser;
-
+    const userInfo = getUserInfo();
     if (userInfo?.address && userInfo.address !== "No address found") {
       setAddress(userInfo.address);
     }
@@ -44,9 +52,8 @@ const Cart = () => {
     }
 
     try {
-      const rawUser = JSON.parse(localStorage.getItem("user_info") || "{}");
-      const userInfo = Array.isArray(rawUser) ? rawUser[0] : rawUser;
-      const userId = userInfo._id || userInfo.sub;
+      const userInfo = getUserInfo();
+      const userId = userInfo._id;
 
       if (!userId) {
         alert("Không tìm thấy thông tin người dùng");
@@ -55,10 +62,7 @@ const Cart = () => {
 
       const response = await fetch(`http://localhost:5000/users/${userId}`, {
         method: "PATCH",
-        headers: {
-          "Content-Type": "application/json",
-          // Nếu backend cần token: Authorization: `Bearer ${localStorage.getItem("accessToken")}`
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ address: newAddress }),
       });
 
@@ -87,9 +91,8 @@ const Cart = () => {
       return;
     }
 
-    const rawUser = JSON.parse(localStorage.getItem("user_info") || "{}");
-    const userInfo = Array.isArray(rawUser) ? rawUser[0] : rawUser;
-    const userId = userInfo._id || userInfo.sub;
+    const userInfo = getUserInfo();
+    const userId = userInfo._id;
 
     if (!userId) {
       alert("Thông tin người dùng chưa đầy đủ hoặc bị thiếu.");
@@ -100,22 +103,22 @@ const Cart = () => {
       customerId: userId,
       items: products.map((product) => ({
         productId: product._id,
-        supplierId: product.supplierId,
+        supplierId: String(product.supplierId && product.supplierId._id ? product.supplierId._id : product.supplierId).trim(),
         quantity: product.quantity,
         price: product.price,
       })),
       totalAmount: totalWithTax,
       shippingAddress: address,
       paymentMethod: "Thanh toán khi nhận hàng",
-      status: "Đã đặt hàng",
+      status: "pending",
     };
+
+    console.log("Dữ liệu gửi lên server:", orderData);
 
     try {
       const response = await fetch("http://localhost:5000/orders", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify(orderData),
       });
 
@@ -130,7 +133,6 @@ const Cart = () => {
       alert("Đặt hàng không thành công!");
     }
   };
-
   return (
     <div className="flex flex-col md:flex-row py-16 max-w-6xl w-full px-6 mx-auto">
       <div className="flex-1 max-w-4xl">

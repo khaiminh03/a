@@ -6,6 +6,10 @@ class OrderItemDto {
   @IsString()
   productId: string;
 
+  @IsNotEmpty() // ✅ thêm dòng này
+  @IsString()
+  supplierId: string;
+
   @IsNumber()
   quantity: number;
 

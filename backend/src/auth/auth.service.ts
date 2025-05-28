@@ -16,26 +16,42 @@ export class AuthService {
   ) {}
 
   // Đăng ký người dùng mới
+  // async register(createUserDto: CreateUserDto) {
+  //   const { email, password, ...rest } = createUserDto;
+
+  //   const userExists = await this.userService.findByEmail(email);
+  //   if (userExists) {
+  //     throw new BadRequestException('Email already exists');
+  //   }
+
+  //   // const hashedPassword = await bcrypt.hash(password, 10);
+  //   const newUser = await this.userService.create({
+  //     email,
+  //     password: hashedPassword,
+  //     ...rest,
+  //   });
+
+  //   return {
+  //     message: 'User registered successfully',
+  //     user: newUser,
+  //   };
+  // }
   async register(createUserDto: CreateUserDto) {
-    const { email, password, ...rest } = createUserDto;
+  const { email } = createUserDto;
 
-    const userExists = await this.userService.findByEmail(email);
-    if (userExists) {
-      throw new BadRequestException('Email already exists');
-    }
-
-    const hashedPassword = await bcrypt.hash(password, 10);
-    const newUser = await this.userService.create({
-      email,
-      password: hashedPassword,
-      ...rest,
-    });
-
-    return {
-      message: 'User registered successfully',
-      user: newUser,
-    };
+  const userExists = await this.userService.findByEmail(email);
+  if (userExists) {
+    throw new BadRequestException('Email already exists');
   }
+
+  // Truyền nguyên password plaintext cho userService.create
+  const newUser = await this.userService.create(createUserDto);
+
+  return {
+    message: 'User registered successfully',
+    user: newUser,
+  };
+}
 
   // Kiểm tra đăng nhập email + password
   async validateUser(email: string, password: string): Promise<UserDocument> {
@@ -50,7 +66,6 @@ export class AuthService {
     }
     return user;
   }
-
   // Đăng nhập với email và password
   async login(loginUserDto: LoginUserDto) {
     const { email, password } = loginUserDto;

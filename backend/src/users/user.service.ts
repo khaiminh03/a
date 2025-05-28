@@ -8,13 +8,20 @@ import * as bcrypt from 'bcrypt';
 @Injectable()
 export class UserService {
   constructor(@InjectModel(User.name) private userModel: Model<UserDocument>) {}
-
-  // Phương thức tạo người dùng
   async create(createUserDto: CreateUserDto): Promise<UserDocument> {
-    // Không cần mã hóa mật khẩu ở đây nữa
-    const createdUser = new this.userModel(createUserDto);
-    return createdUser.save();
+  // 🔎 Kiểm tra email đã tồn tại chưa
+  const existingUser = await this.userModel.findOne({ email: createUserDto.email });
+  if (existingUser) {
+    throw new BadRequestException('Email đã có');
   }
+
+  const salt = await bcrypt.genSalt();
+  const hashedPassword = await bcrypt.hash(createUserDto.password, salt);
+  createUserDto.password = hashedPassword;
+
+  const createdUser = new this.userModel(createUserDto);
+  return createdUser.save();
+}
 
   async findAll(): Promise<User[]> {
     return this.userModel.find().select('-password').exec();
@@ -30,13 +37,17 @@ export class UserService {
 
    // Phương thức để cập nhật người dùng
    // Phương thức cập nhật người dùng
-  async update(userId: string, updateUserDto: Partial<UpdateUserDto>): Promise<UserDocument> {
-    const updatedUser = await this.userModel.findByIdAndUpdate(userId, updateUserDto, { new: true }).exec();
-    if (!updatedUser) {
-      throw new NotFoundException('User not found');
-    }
-    return updatedUser;
+ async update(userId: string, updateUserDto: Partial<UpdateUserDto>): Promise<UserDocument> {
+  if (!userId) {
+    throw new BadRequestException('User ID không được để trống');
   }
+  const updatedUser = await this.userModel.findByIdAndUpdate(userId, updateUserDto, { new: true }).exec();
+  if (!updatedUser) {
+    throw new NotFoundException('User không tồn tại');
+  }
+  return updatedUser;
+}
+
   
 
   async remove(id: string): Promise<User> {

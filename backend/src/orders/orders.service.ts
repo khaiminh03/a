@@ -1,9 +1,10 @@
 import { Injectable, BadRequestException, NotFoundException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Order, OrderDocument } from './schemas/order.schema';
-import { Model } from 'mongoose';
+import { Model, Types } from 'mongoose';
 import { CreateOrderDto } from './dto/create-order.dto';
 import { Product, ProductDocument } from '../products/schemas/product.schema';
+
 @Injectable()
 export class OrdersService {
   constructor(
@@ -11,16 +12,9 @@ export class OrdersService {
     @InjectModel(Product.name) private readonly productModel: Model<ProductDocument>,
   ) {}
 
-//   async create(createOrderDto: CreateOrderDto) {
-//   try {
-//     return await this.orderModel.create(createOrderDto);
-//   } catch (error) {
-//     throw new Error(`Failed to create order: ${error.message}`);
-//   }
-// }
-async create(createOrderDto: CreateOrderDto) {
+  async create(createOrderDto: CreateOrderDto) {
     try {
-      // 1. Duyệt qua từng sản phẩm để kiểm tra và trừ tồn kho
+      // 1. Kiểm tra từng sản phẩm
       for (const item of createOrderDto.items) {
         const product = await this.productModel.findById(item.productId);
         if (!product) {
@@ -35,58 +29,70 @@ async create(createOrderDto: CreateOrderDto) {
         await product.save();
       }
 
-      // 2. Tạo đơn hàng sau khi trừ stock
-      const order = new this.orderModel(createOrderDto);
+      // 2. Chuyển tất cả ID sang ObjectId trước khi lưu
+      const orderToSave = {
+        ...createOrderDto,
+        customerId: new Types.ObjectId(createOrderDto.customerId),
+        items: createOrderDto.items.map(item => ({
+          ...item,
+          productId: new Types.ObjectId(item.productId),
+          supplierId: new Types.ObjectId(item.supplierId),
+        })),
+      };
+
+      const order = new this.orderModel(orderToSave);
       return await order.save();
     } catch (error) {
       throw new Error(`Failed to create order: ${error.message}`);
     }
   }
 
-async getOrdersWithProductDetails() {
-  try {
-    return await this.orderModel
-      .find()
-      .populate({
-        path: 'items.productId',
-        select: 'name images categoryId',
-        populate: {
-          path: 'categoryId',
-          select: 'name',
-        },
-      })
-      .exec();
-  } catch (error) {
-    throw new Error(`Failed to get orders: ${error.message}`);
+  async getOrdersWithProductDetails() {
+    try {
+      return await this.orderModel
+        .find()
+        .populate({
+          path: 'items.productId',
+          select: 'name images categoryId',
+          populate: {
+            path: 'categoryId',
+            select: 'name',
+          },
+        })
+        .exec();
+    } catch (error) {
+      throw new Error(`Failed to get orders: ${error.message}`);
+    }
   }
-}
 
-async getOrdersByCustomerId(customerId: string) {
-  try {
-    return await this.orderModel
-      .find({ customerId })
-      .populate({
-        path: 'items.productId',
-        select: 'name images categoryId',
-        populate: {
-          path: 'categoryId',
-          select: 'name',
-        },
-      })
-      .exec();
-  } catch (error) {
-    throw new Error(`Failed to get orders by customer: ${error.message}`);
+  async getOrdersByCustomerId(customerId: string) {
+    try {
+      return await this.orderModel
+        .find({ customerId: new Types.ObjectId(customerId) }) // ✅ đảm bảo match
+        .populate({
+          path: 'items.productId',
+          select: 'name images categoryId',
+          populate: {
+            path: 'categoryId',
+            select: 'name',
+          },
+        })
+        .exec();
+    } catch (error) {
+      throw new Error(`Failed to get orders by customer: ${error.message}`);
+    }
   }
-}
-async getOrdersBySupplierId(supplierId: string) {
-  return this.orderModel.find({
-    'items.supplierId': supplierId,
-  })
-  .populate({
-    path: 'items.productId',
-    select: 'name price',
-  })
-  .exec();
+
+  async getOrdersBySupplierId(supplierId: string) {
+  return this.orderModel
+    .find({
+      'items.supplierId': new Types.ObjectId(supplierId),
+    })
+    .populate({
+      path: 'items.productId',
+      select: 'name price',
+    })
+    .exec();
 }
 
 }
