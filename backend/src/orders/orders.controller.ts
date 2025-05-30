@@ -1,4 +1,4 @@
-import { Controller, Post, Body, Get, Param, HttpException, HttpStatus } from '@nestjs/common';
+import { Controller, Post, Body, Get, Param,Patch,Req , HttpException, HttpStatus } from '@nestjs/common';
 import { OrdersService } from './orders.service';
 import { CreateOrderDto } from './dto/create-order.dto';
 
@@ -36,4 +36,11 @@ export class OrdersController {
 async getOrdersBySupplier(@Param('id') supplierId: string) {
   return this.ordersService.getOrdersBySupplierId(supplierId);
 }
+  @Patch(':orderId/status')
+  async updateOrderStatus(
+    @Param('orderId') orderId: string,
+    @Body('status') status: string
+  ) {
+    return this.ordersService.updateOrderStatus(orderId, status);
+  }
 }

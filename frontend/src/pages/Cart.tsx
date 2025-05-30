@@ -37,12 +37,15 @@ const Cart = () => {
     updatedProducts[index].quantity = newQty;
     setProducts(updatedProducts);
     localStorage.setItem("cart", JSON.stringify(updatedProducts));
+    window.dispatchEvent(new Event("cartUpdated"));
+    
   };
 
   const removeProduct = (index: number) => {
     const updatedProducts = products.filter((_, i) => i !== index);
     setProducts(updatedProducts);
     localStorage.setItem("cart", JSON.stringify(updatedProducts));
+    window.dispatchEvent(new Event("cartUpdated"));
   };
 
   const updateAddress = async (newAddress: string) => {
@@ -110,7 +113,7 @@ const Cart = () => {
       totalAmount: totalWithTax,
       shippingAddress: address,
       paymentMethod: "Thanh toán khi nhận hàng",
-      status: "pending",
+      status: "Chờ xác nhận",
     };
 
     console.log("Dữ liệu gửi lên server:", orderData);

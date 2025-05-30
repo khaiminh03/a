@@ -90,9 +90,27 @@ export class OrdersService {
     })
     .populate({
       path: 'items.productId',
-      select: 'name price',
+      select: 'name images price',
+    })
+    .populate({
+      path: 'customerId',
+      select: 'name phone email address', 
     })
     .exec();
 }
 
+   async updateOrderStatus(orderId: string, status: string): Promise<Order> {
+    const allowed = ['Đã đặt hàng', 'Đã xác nhận', 'Đang giao hàng', 'Hoàn thành'];
+    if (!allowed.includes(status)) {
+      throw new BadRequestException('Trạng thái không hợp lệ');
+    }
+
+    const order = await this.orderModel.findById(orderId);
+    if (!order) throw new NotFoundException('Không tìm thấy đơn hàng');
+
+    order.status = status;
+    await order.save();
+
+    return order;
+  }
 }

@@ -70,21 +70,26 @@ export class UserController {
 
   // PATCH cập nhật user có nhận file avatar upload
   @Patch(':id')
-  @UseInterceptors(FileInterceptor('avatar', { storage }))
-  async updateUser(
-    @Param('id') id: string,
-    @Body() dto: UpdateUserDto,
-    @UploadedFile() file?: Express.Multer.File,
-  ) {
-    console.log('Received id in controller:', id);
+@UseInterceptors(FileInterceptor('avatar', { storage }))
+async updateUser(
+  @Param('id') id: string,
+  @Body() dto: UpdateUserDto,
+  @UploadedFile() file?: Express.Multer.File,
+) {
+  console.log('Received id in controller:', id);
+  console.log('DTO:', dto);
 
-    if (file) {
-      // Gán đường dẫn avatar (có thể là đường dẫn public truy cập được)
-      dto.avatarUrl = `/uploads/avatar/${file.filename}`;
-    }
-
-    return this.userService.update(id, dto);
+  if (!id) {
+    throw new Error('User ID is missing in request parameters');
   }
+
+  if (file) {
+    dto.avatarUrl = `/uploads/avatar/${file.filename}`;
+  }
+
+  return this.userService.update(id, dto);
+}
+
 
   @Delete(':id')
   remove(@Param('id') id: string) {

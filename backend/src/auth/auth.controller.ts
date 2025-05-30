@@ -28,7 +28,7 @@ export class AuthController {
 @Get('google/callback')
 async googleCallback(@Req() req, @Res() res) {
   const { access_token } = req.user; // Lấy token đã tạo sẵn trong GoogleStrategy
-  res.redirect(`http://localhost:5173?token=${access_token}`);
+  res.redirect(`http://localhost:5173/login?token=${access_token}`);
 }
 @Put('update-address-phone/:userId')
 async updateAddressAndPhone(

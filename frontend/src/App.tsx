@@ -19,6 +19,8 @@ import ProductsPage from "./pages/ProductsPage";
 import AllProducts from "./components/AllProducts";
 import SearchPage from "./components/SearchPage";
 import AdminSupplierList from "./components/AdminSupplierList";
+import LoginForm from "./components/LoginForm";
+import SupplierOrderManagement from "./pages/SupplierOrderManagement";
 
 const App: React.FC = () => {
   const location = useLocation();
@@ -35,20 +37,21 @@ const App: React.FC = () => {
           <Route path="/add" element={<CategoryPage />} />
           <Route path="/sp" element={<AddProduct />} />
           <Route path="/dangky" element={<RegisterForm />} />
-          
+          <Route path="/login" element={<LoginForm />} />
           <Route path="/product/:id" element={<ProductDetail />} />
           <Route path="/cart" element={<Cart />} />
           <Route path="/myorder" element={<MyOrders />} />
           <Route path="/products/category/:categoryId" element={<ProductsByCategory />} />
           <Route path="/products" element={<AllProducts />} />
           <Route path="/search" element={<SearchPage />} />
+           <Route path="/editstatus" element={<SupplierOrderManagement />} />
            
 
           <Route path="/seller" element={<SellerLayout />}>
-            <Route index element={<AddProduct />} />
-            <Route path="add-product" element={<AddProduct />} />
-            <Route path="overview" element={<ProductsPage />} />
-          </Route>
+          <Route index element={<AddProduct />} />
+          <Route path="add-product" element={<AddProduct />} />
+          <Route path="overview" element={<ProductsPage />} />
+        </Route>
         </Routes>
       </div>
       <ToastContainer

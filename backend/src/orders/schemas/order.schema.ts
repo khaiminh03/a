@@ -39,8 +39,8 @@ export class Order {
   @Prop({ required: true })
   paymentMethod: string;
 
-  @Prop({ default: 'Đã đặt hàng' })
-  status: string;
+  @Prop() 
+  status?: string;
 
   @Prop({ default: false })
   isPaid: boolean;

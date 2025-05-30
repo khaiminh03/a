@@ -7,6 +7,7 @@ const Navbar = () => {
   const [open, setOpen] = useState(false);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
+  const [cartCount, setCartCount] = useState(0);
   const [showSupplierModal, setShowSupplierModal] = useState(false);
   const [storeName, setStoreName] = useState("");
   const [phone, setPhone] = useState("");
@@ -43,6 +44,22 @@ const Navbar = () => {
     return () => window.removeEventListener("storage", checkLogin);
   }, []);
 
+   // ✅ Listen and update cart count
+  useEffect(() => {
+    const updateCartCount = () => {
+      const cart = JSON.parse(localStorage.getItem("cart") || "[]");
+      const total = cart.reduce((acc: number, item: any) => acc + item.quantity, 0);
+      setCartCount(total);
+    };
+
+    updateCartCount(); // initial
+    window.addEventListener("cartUpdated", updateCartCount);
+    window.addEventListener("storage", updateCartCount);
+    return () => {
+      window.removeEventListener("cartUpdated", updateCartCount);
+      window.removeEventListener("storage", updateCartCount);
+    };
+  }, []);
   // Hàm thay đổi: mở modal login thay vì navigate đến /login
   const handleAuthClick = () => {
     if (isLoggedIn) {
@@ -188,14 +205,27 @@ const Navbar = () => {
 
   // Cập nhật thông tin cá nhân
  const handleUpdateProfile = async () => {
-  if (!userInfo) return alert("Chưa có thông tin người dùng");
   const token = localStorage.getItem("accessToken");
   if (!token) {
     alert("Bạn chưa đăng nhập");
     navigate("/login");
     return;
   }
+
+  if (!userInfo) {
+    alert("Không có thông tin người dùng trong localStorage");
+    return;
+  }
+
   const userId = userInfo.sub;
+  console.log("🔎 userInfo:", userInfo);
+  console.log("🔑 userId (from sub):", userId);
+
+  if (!userId) {
+    alert("Không tìm thấy ID người dùng để cập nhật.");
+    return;
+  }
+
   setProfileLoading(true);
 
   try {
@@ -205,37 +235,43 @@ const Navbar = () => {
     formData.append("address", userInfo.address || "");
 
     if (avatarFile) {
-      formData.append("avatar", avatarFile);
+      formData.append("avatar", avatarFile); // đúng tên field backend đang nhận
     }
 
     const res = await fetch(`http://localhost:5000/users/${userId}`, {
       method: "PATCH",
       headers: {
         Authorization: `Bearer ${token}`,
-        // **KHÔNG set Content-Type ở đây**, để browser tự set boundary multipart/form-data
+        // KHÔNG set Content-Type nếu dùng FormData
       },
       body: formData,
     });
 
     if (res.ok) {
+      const updatedUser = await res.json();
+      console.log("✅ updatedUser từ server:", updatedUser);
+
+      // Giữ lại `sub` nếu backend không trả về
+      const newUserInfo = {
+        ...updatedUser,
+        sub: userId, // thêm lại sub để lần sau sử dụng
+      };
+
+      localStorage.setItem("user_info", JSON.stringify(newUserInfo));
+      setUserInfo(newUserInfo);
       alert("Cập nhật thông tin thành công!");
       setShowProfileModal(false);
-
-      // Cập nhật lại localStorage và state userInfo với avatarUrl mới (nên lấy từ response backend)
-      const updatedUser = await res.json();
-      localStorage.setItem("user_info", JSON.stringify(updatedUser));
-      setUserInfo(updatedUser);
     } else {
       const err = await res.json();
-      alert("Lỗi cập nhật: " + err.message);
+      alert("Lỗi cập nhật: " + (err.message || res.statusText));
     }
-  } catch {
+  } catch (err) {
+    console.error("❌ Lỗi hệ thống khi cập nhật hồ sơ:", err);
     alert("Lỗi hệ thống khi cập nhật hồ sơ!");
   } finally {
     setProfileLoading(false);
   }
 };
-
   return (
     <>
        <nav className="flex items-center justify-between px-6 md:px-16 lg:px-24 xl:px-32 py-4 border-b border-gray-300 bg-white relative transition-all">
@@ -272,17 +308,22 @@ const Navbar = () => {
               className="w-6 opacity-80"
             />
             <button className="absolute -top-2 -right-3 text-xs text-white bg-green-500 w-[18px] h-[18px] rounded-full">
-              3
+              {cartCount}
             </button>
           </div>
 
           {isLoggedIn ? (
             <div className="relative group">
-              <img
-                src={userInfo?.avatarUrl || assets.profile_icon}
-                className="w-10 h-10 rounded-full cursor-pointer"
-                alt="profile"
-              />
+              <img src={
+                    userInfo?.avatarUrl
+                      ? userInfo.avatarUrl.startsWith("http") || userInfo.avatarUrl.startsWith("data:")
+                        ? userInfo.avatarUrl // nếu là base64 preview
+                        : `http://localhost:5000${userInfo.avatarUrl}` // nếu là đường dẫn từ server
+                      : assets.profile_icon
+                  }
+                  className="w-10 h-10 rounded-full cursor-pointer object-cover"
+                  alt="profile"
+                />
               <ul className="hidden group-hover:block absolute top-10 right-0 bg-white shadow border border-gray-200 py-2.5 w-40 rounded-md text-sm z-40">
                 <li
                   onClick={() => setShowProfileModal(true)}

@@ -33,7 +33,7 @@ const SellerLayout = () => {
             onClick={handleLogout}
             className="border rounded-full text-sm px-4 py-1"
           >
-            Logout
+            Đăng xuất
           </button>
         </div>
       </div>
