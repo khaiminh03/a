@@ -8,7 +8,7 @@ import { ConfigModule } from '@nestjs/config';
 import googleOAuthConfig from './config/google-oauth.config';
 import { GoogleStrategy } from './strategies/google.strategy';
 import { PassportModule } from '@nestjs/passport';
-
+import { EmailService } from '../email/email.service';
 
 
 @Module({
@@ -22,6 +22,7 @@ import { PassportModule } from '@nestjs/passport';
     ConfigModule.forFeature(googleOAuthConfig),
   ],
   controllers: [AuthController],
-  providers: [AuthService, JwtStrategy, GoogleStrategy],
+  providers: [AuthService, JwtStrategy, GoogleStrategy,EmailService],
+  exports: [JwtModule],
 })
 export class AuthModule {}

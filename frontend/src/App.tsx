@@ -1,9 +1,9 @@
 import React from "react";
-import { Route, Routes, useLocation } from "react-router-dom";
+import { Route, Routes, useLocation, matchPath } from "react-router-dom";
 import { ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
-//import { useAppContext } from "./context/AppContext";
 
+// Pages & Components
 import Home from "./pages/Home";
 import CategoryPage from './pages/CategoryPage';
 import AddProduct from "./pages/AddProduct";
@@ -13,50 +13,120 @@ import Footer from "./components/Footer";
 import Cart from "./pages/Cart";
 import Navbar from "./components/Navbar";
 import MyOrders from "./pages/MyOrders";
-import ProductsByCategory from "./components/ProductByCategory"
+import ProductsByCategory from "./components/ProductByCategory";
 import SellerLayout from "./pages/SellerLayout";
 import ProductsPage from "./pages/ProductsPage";
 import AllProducts from "./components/AllProducts";
 import SearchPage from "./components/SearchPage";
-import AdminSupplierList from "./components/AdminSupplierList";
 import LoginForm from "./components/LoginForm";
 import SupplierOrderManagement from "./pages/SupplierOrderManagement";
+import SupplierRevenueDashboard from "./pages/SupplierRevenueDashboard";
+import AdminLayout from "./pages/AdminLayout";
+import AdminSupplierList from "./components/AdminSupplierList";
+import UserManagement from "./components/UserManagement";
+import AllProductPage from "./components/AllProductPage";
+import AdminOrders from "./pages/AdminOrder";
+import VerifyEmail from "./pages/VerifyEmail";
+import ForgotPasswordForm from "./pages/ForgotPasswordForm";
+import ResetPasswordForm from "./pages/ResetPasswordForm";
+import ProtectedRoute from "./components/ProtectedRoute";
+import AdminPendingProducts from "./pages/AdminPendingProducts";
+import AdminReviewList from "./pages/AdminReviewList";
+import ProductCardEdit from "./pages/ProductCardEdit";
+import AdminCharts from "./pages/AdminCharts";
+import SellerProfileForm from "./pages/SellerProfileForm";
+import SupplierStore from "./pages/SupplierStore";
 
 const App: React.FC = () => {
   const location = useLocation();
-  //const { user } = useAppContext();
+
+  // Danh sách route công khai
+  const publicPatterns = [
+    "/", "/add", "/sp", "/sign", "/login", "/cart", "/myorder",
+    "/products", "/products/category/:categoryId", "/product/:id",
+    "/search", "/verify-email", "/forgot-password", "/reset-password",
+    "/supplier/:id"
+  ];
+
+  // Hiển thị Navbar/Footer nếu KHÔNG thuộc admin/seller và thuộc publicPatterns
+  const isPublicRoute =
+    !location.pathname.startsWith("/admin") &&
+    !location.pathname.startsWith("/seller") &&
+    publicPatterns.some((pattern) =>
+      matchPath({ path: pattern, end: false }, location.pathname)
+    );
 
   return (
-    <div>
-      {!location.pathname.startsWith("/seller") && <Navbar />}
+    <div className="min-h-screen flex flex-col">
+      {/* Navbar chỉ hiển thị khi là public route */}
+      {isPublicRoute && <Navbar />}
 
-      <div className="px-6 md:px-16 lg:px-24 xl:px-32">
+      <div className="flex-1 px-6 md:px-16 lg:px-24 xl:px-32">
         <Routes>
+          {/* Public Routes */}
           <Route path="/" element={<Home />} />
-          <Route path="/admin" element={<AdminSupplierList />} />
           <Route path="/add" element={<CategoryPage />} />
           <Route path="/sp" element={<AddProduct />} />
-          <Route path="/dangky" element={<RegisterForm />} />
+          <Route path="/sign" element={<RegisterForm />} />
           <Route path="/login" element={<LoginForm />} />
           <Route path="/product/:id" element={<ProductDetail />} />
           <Route path="/cart" element={<Cart />} />
           <Route path="/myorder" element={<MyOrders />} />
           <Route path="/products/category/:categoryId" element={<ProductsByCategory />} />
           <Route path="/products" element={<AllProducts />} />
+          <Route path="/supplier/:id" element={<SupplierStore />} />
           <Route path="/search" element={<SearchPage />} />
-           <Route path="/editstatus" element={<SupplierOrderManagement />} />
-           
+          <Route path="/verify-email" element={<VerifyEmail />} />
+          <Route path="/forgot-password" element={<ForgotPasswordForm />} />
+          <Route path="/reset-password" element={<ResetPasswordForm />} />
 
-          <Route path="/seller" element={<SellerLayout />}>
-          <Route index element={<AddProduct />} />
-          <Route path="add-product" element={<AddProduct />} />
-          <Route path="overview" element={<ProductsPage />} />
-        </Route>
+          {/* Seller (Supplier) Routes */}
+          <Route
+            path="/seller"
+            element={
+              <ProtectedRoute allowedRoles={["supplier"]}>
+                <SellerLayout />
+              </ProtectedRoute>
+            }
+          >
+            <Route index element={<AddProduct />} />
+            <Route path="add-product" element={<AddProduct />} />
+            <Route path="overview" element={<ProductsPage />} />
+            <Route path="rejected" element={<ProductCardEdit />} />
+            <Route path="order" element={<SupplierOrderManagement />} />
+            <Route path="revenue" element={<SupplierRevenueDashboard />} />
+            <Route path="profile" element={<SellerProfileForm />} />
+          </Route>
+
+          {/* Admin Routes */}
+          <Route
+            path="/admin"
+            element={
+              <ProtectedRoute allowedRoles={["admin"]}>
+                <AdminLayout />
+              </ProtectedRoute>
+            }
+          >
+            <Route index element={<UserManagement />} />
+            <Route path="add-user" element={<UserManagement />} />
+            <Route path="supplier" element={<AdminSupplierList />} />
+            <Route path="category" element={<CategoryPage />} />
+            <Route path="allproduct" element={<AllProductPage />} />
+            <Route path="adminorder" element={<AdminOrders />} />
+            <Route path="adminstatus" element={<AdminPendingProducts />} />
+            <Route path="adminreviews" element={<AdminReviewList />} />
+            <Route path="adminrevenue" element={<AdminCharts />} />
+          </Route>
         </Routes>
       </div>
+
+      {/* Footer chỉ hiển thị khi là public route */}
+      {isPublicRoute && <Footer />}
+
+      {/* Thông báo Toast */}
       <ToastContainer
         position="top-right"
-        autoClose={3000} // tự tắt sau 3 giây
+        autoClose={3000}
         hideProgressBar={false}
         newestOnTop={false}
         closeOnClick
@@ -65,7 +135,6 @@ const App: React.FC = () => {
         draggable
         pauseOnHover
       />
-      <Footer />
     </div>
   );
 };

@@ -5,6 +5,7 @@ import { Product, ProductDocument } from './schemas/product.schema';
 import { CreateProductDto } from './dto/create-product.dto';
 import { UpdateProductDto } from './dto/update-product.dto';
 import { StoreProfile, StoreProfileDocument } from '../store-profile/schemas/store-profile.schema';
+import { Notification } from '../notification/schemas/notification.schema';
 
 interface SupplierPopulated {
   _id: Types.ObjectId;
@@ -21,6 +22,7 @@ export class ProductsService {
   constructor(
     @InjectModel(Product.name) private productModel: Model<ProductDocument>,
     @InjectModel(StoreProfile.name) private storeProfileModel: Model<StoreProfileDocument>,
+    @InjectModel(Notification.name) private notificationModel: Model<Notification>,
   ) {}
 
   async create(createProductDto: CreateProductDto): Promise<Product> {
@@ -32,11 +34,28 @@ export class ProductsService {
   }
 
   async findAll(): Promise<Product[]> {
-    return this.productModel
-      .find({ isActive: true, status: 'pending' })
-      .sort({ createdAt: -1 })
-      .exec();
+  return this.productModel
+    .find({ isActive: true, status: 'approved' }) // đã duyệt mới cho khách xem
+    .sort({ createdAt: -1 })
+    .exec();
+}
+ async findWithFilter(filter: any): Promise<any[]> {
+  const products = await this.productModel
+    .find(filter)
+    .sort({ createdAt: -1 })
+    .lean();
+
+  // Lấy storeName từ bảng storeprofiles
+  for (const product of products) {
+    const supplierId = product.supplierId;
+    const storeProfile = await this.storeProfileModel.findOne({ userId: supplierId }).lean();
+    if (storeProfile) {
+      (product as any).storeName = storeProfile.storeName;
+    }
   }
+
+  return products;
+}
 
   async findOne(id: string): Promise<any> {
     const product = await this.productModel.findById(id)
@@ -58,7 +77,8 @@ export class ProductsService {
     if (storeProfile) {
       supplier.storeName = storeProfile.storeName;
       supplier.imageUrl = storeProfile.imageUrl;
-      supplier.address = storeProfile.address; // optional override
+      supplier.address = storeProfile.address;
+      supplier.phone = storeProfile.phone;
     }
 
     return product;
@@ -69,7 +89,6 @@ export class ProductsService {
       .find({
         categoryId: new Types.ObjectId(categoryId.trim()),
         isActive: true,
-        status: 'approved',
       })
       .exec();
   }
@@ -81,30 +100,66 @@ export class ProductsService {
       .exec();
   }
 
-  async searchByName(keyword: string): Promise<Product[]> {
-    return this.productModel
-      .find({
-        $text: { $search: keyword },
-        isActive: true,
-        status: 'approved',
-      })
-      .exec();
+ async searchByName(keyword: string): Promise<Product[]> {
+  return this.productModel.find({
+    name: { $regex: keyword, $options: 'i' },
+    isActive: true,
+    status: 'approved',
+  }).exec();
+}
+
+async updateById(id: string, updateProductDto: UpdateProductDto): Promise<Product> {
+  const updateQuery: any = {
+    ...updateProductDto,
+  };
+
+  // Nếu là gửi lại sản phẩm => xóa rejectionReason
+  if (updateProductDto.status === 'pending') {
+    updateQuery.$unset = { rejectionReason: '' };
   }
 
-  async updateById(id: string, updateProductDto: UpdateProductDto): Promise<Product> {
-    const updated = await this.productModel.findByIdAndUpdate(
-      id,
-      updateProductDto,
-      { new: true },
-    );
-    if (!updated) {
-      throw new NotFoundException(`Product with id ${id} not found`);
-    }
-    return updated;
+  const updated = await this.productModel.findByIdAndUpdate(id, updateQuery, {
+    new: true,
+    runValidators: true,
+  });
+
+  if (!updated) {
+    throw new NotFoundException(`Product with id ${id} not found`);
   }
+
+  // Nếu bị từ chối → tạo thông báo
+  if (updateProductDto.status === 'rejected') {
+    const supplierId = updated.supplierId;
+    const title = 'Sản phẩm bị từ chối';
+    const message = `Sản phẩm "${updated.name}" của bạn đã bị từ chối. Lý do: ${updateProductDto.rejectionReason}`;
+
+    await this.notificationModel.create({
+      userId: supplierId,
+      title,
+      content: message,
+    });
+  }
+
+  return updated;
+}
+
 
   async deleteById(id: string): Promise<{ deleted: boolean }> {
     const result = await this.productModel.deleteOne({ _id: id }).exec();
     return { deleted: result.deletedCount > 0 };
   }
+  // san pham tuong tu
+ async getSimilarProducts(categoryId: string, excludeId: string): Promise<Product[]> {
+  return this.productModel.find({
+    categoryId: new Types.ObjectId(categoryId),
+    _id: { $ne: new Types.ObjectId(excludeId) }, // loại trừ sản phẩm đang xem
+    isActive: true,
+    status: 'approved',
+  })
+  .limit(6) // giới hạn 6 sản phẩm tương tự
+  .exec();
+}
+
+
+
 }

@@ -15,4 +15,5 @@ export class UpdateProductDto {
   supplierId?: string | Types.ObjectId;
   isActive?: boolean;
   status?: 'pending' | 'approved' | 'rejected' | 'out_of_stock';
+  rejectionReason?: string;
 }

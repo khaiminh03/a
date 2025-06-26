@@ -1,5 +1,5 @@
 import { ReactNode, useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import { AppContext } from "./AppContext";
 import { AppContextType, UserType } from "../types";
 import jwtDecode from "jwt-decode";
@@ -8,13 +8,24 @@ interface AppContextProviderProps {
   children: ReactNode;
 }
 
+interface DecodedToken {
+  sub: string;
+  role: string;
+  name?: string;
+  email: string;
+  phone?: string;
+  address?: string;
+}
+
 export const AppContextProvider = ({ children }: AppContextProviderProps) => {
   const navigate = useNavigate();
+  const location = useLocation();
   const [user, setUser] = useState<UserType | null>(null);
   const [isSeller, setIsSeller] = useState<boolean>(false);
+  const [loading, setLoading] = useState(true);
 
+  // ✅ Khôi phục user từ token
   useEffect(() => {
-    // Kiểm tra token trong URL
     const params = new URLSearchParams(window.location.search);
     const token = params.get("token");
 
@@ -23,39 +34,78 @@ export const AppContextProvider = ({ children }: AppContextProviderProps) => {
       window.history.replaceState({}, document.title, "/");
 
       try {
-        const decodedUser = jwtDecode<UserType>(token);
-        localStorage.setItem("user_info", JSON.stringify(decodedUser));
-        setUser(decodedUser);
+        const decoded = jwtDecode<DecodedToken>(token);
+        const userInfo: UserType = {
+          _id: decoded.sub,
+          name: decoded.name ?? "",
+          email: decoded.email,
+          password: "",
+          phone: decoded.phone ?? "",
+          address: decoded.address ?? "",
+          role: decoded.role as "customer" | "supplier" | "admin",
+        };
+        localStorage.setItem("user_info", JSON.stringify(userInfo));
+        setUser(userInfo);
       } catch (err) {
-        console.error("Không thể giải mã token:", err);
+        console.error("❌ Không thể giải mã token:", err);
       }
     } else {
-      // Lấy token từ localStorage
       const storedToken = localStorage.getItem("accessToken");
-      if (storedToken) {
+      const storedUser = localStorage.getItem("user_info");
+      if (storedToken && storedUser) {
         try {
-          const decodedUser = jwtDecode<UserType>(storedToken);
-          localStorage.setItem("user_info", JSON.stringify(decodedUser));
-          setUser(decodedUser);
+          const parsed = JSON.parse(storedUser) as UserType;
+          setUser(parsed);
         } catch (err) {
-          console.error("Không thể giải mã token từ localStorage:", err);
+          console.error("❌ Lỗi khi parse user_info:", err);
         }
       }
     }
+
+    setLoading(false);
   }, []);
 
-  // Kiểm soát redirect theo role user, bạn có thể giữ logic này ở đây hoặc ở App.tsx
+  // ✅ Đồng bộ user khi event "authChanged" được gửi
+  useEffect(() => {
+    const syncUser = () => {
+      const userStr = localStorage.getItem("user_info");
+      if (userStr) {
+        setUser(JSON.parse(userStr));
+      }
+    };
+    window.addEventListener("authChanged", syncUser);
+    return () => window.removeEventListener("authChanged", syncUser);
+  }, []);
+
+  // ✅ Tự điều hướng sau khi user được xác định
   useEffect(() => {
     if (user) {
-      if (user.role === "admin" && window.location.pathname !== "/admin") {
+      if (user.role === "admin" && !location.pathname.startsWith("/admin")) {
         navigate("/admin");
-      } else if (user.role !== "admin" && window.location.pathname === "/admin") {
+      } else if (user.role === "supplier" && !location.pathname.startsWith("/seller")) {
+        navigate("/seller");
+      } else if (user.role === "customer" && location.pathname === "/login") {
         navigate("/");
       }
     }
-  }, [user, navigate]);
+  }, [user, navigate, location.pathname]);
 
-  const value: AppContextType = { navigate, user, setUser, isSeller, setIsSeller };
+  const value: AppContextType = {
+    navigate,
+    user,
+    setUser,
+    isSeller,
+    setIsSeller,
+    loading,
+  };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center text-lg">
+        🔄 Đang tải thông tin người dùng...
+      </div>
+    );
+  }
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;
 };

@@ -1,3 +1,4 @@
+declare const module: any;
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
 import { join } from 'path';
@@ -18,5 +19,9 @@ async function bootstrap() {
   const port = process.env.PORT || 5000;
   await app.listen(port);
   console.log(`Application is running on: http://localhost:${port}`);
+  if (module.hot) {
+    module.hot.accept();
+    module.hot.dispose(() => app.close());
+  }
 }
 bootstrap();

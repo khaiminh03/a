@@ -3,104 +3,85 @@ import axios from "axios";
 
 export default function RegisterForm() {
   const [formData, setFormData] = useState({
-    name: "",
     email: "",
     password: "",
-    phone: "",
-    address: "",
   });
 
-  const handleChange = (
-    e: React.ChangeEvent<HTMLInputElement>
-  ) => {
+  const [loading, setLoading] = useState(false);
+
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setLoading(true);
+
     try {
-      const response = await axios.post(
-        "http://localhost:5000/auth/register",
-        formData
-      );
+      const response = await axios.post("http://localhost:5000/auth/register", formData);
       console.log("Đăng ký thành công:", response.data);
-      alert("Đăng ký thành công!");
 
-      // ✅ Reset form sau khi đăng ký
-      setFormData({
-        name: "",
-        email: "",
-        password: "",
-        phone: "",
-        address: "",
-      });
+      alert("🎉 Đăng ký thành công! Vui lòng kiểm tra email để xác minh tài khoản.");
+      setFormData({ email: "", password: "" });
     } catch (error: any) {
-      const errorMessage =
-        error.response?.data?.message || error.response?.data || error.message;
-
-      console.error("Lỗi đăng ký:", errorMessage);
-      alert(`Đăng ký thất bại: ${errorMessage}`);
+      const message =
+        error.response?.data?.message || "Đăng ký thất bại. Vui lòng thử lại.";
+      console.error("Lỗi đăng ký:", message);
+      alert(`${message}`);
+    } finally {
+      setLoading(false);
     }
   };
 
   return (
-    <div className="max-w-md mx-auto mt-10 p-6 bg-white rounded-2xl shadow-md">
-      <h2 className="text-2xl font-bold mb-6 text-center">Đăng ký</h2>
-      <form onSubmit={handleSubmit} className="space-y-4">
-        <input
-          type="text"
-          name="name"
-          placeholder="Tên"
-          value={formData.name}
-          onChange={handleChange}
-          className="w-full border rounded-xl p-3"
-          required
-        />
-        <input
-          type="email"
-          name="email"
-          placeholder="Email"
-          value={formData.email}
-          onChange={handleChange}
-          className="w-full border rounded-xl p-3"
-          required
-        />
-        <input
-          type="password"
-          name="password"
-          placeholder="Mật khẩu"
-          value={formData.password}
-          onChange={handleChange}
-          className="w-full border rounded-xl p-3"
-          required
-          minLength={6}
-        />
-        <input
-          type="text"
-          name="phone"
-          placeholder="Số điện thoại"
-          value={formData.phone}
-          onChange={handleChange}
-          className="w-full border rounded-xl p-3"
-          required
-        />
-        <input
-          type="text"
-          name="address"
-          placeholder="Địa chỉ"
-          value={formData.address}
-          onChange={handleChange}
-          className="w-full border rounded-xl p-3"
-          required
-        />
+    <div className="max-w-md mx-auto mt-20 p-8 bg-white rounded-2xl shadow-2xl">
+      <h2 className="text-3xl font-bold text-center text-gray-800 mb-6">Đăng ký tài khoản</h2>
+      <form onSubmit={handleSubmit} className="space-y-5">
+        <div>
+          <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-1">Email</label>
+          <input
+            id="email"
+            type="email"
+            name="email"
+            placeholder="Nhập email của bạn"
+            value={formData.email}
+            onChange={handleChange}
+            required
+            className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500"
+          />
+        </div>
+
+        <div>
+          <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-1">Mật khẩu</label>
+          <input
+            id="password"
+            type="password"
+            name="password"
+            placeholder="Tối thiểu 6 ký tự"
+            value={formData.password}
+            onChange={handleChange}
+            minLength={6}
+            required
+            className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500"
+          />
+        </div>
 
         <button
           type="submit"
-          className="w-full bg-blue-600 text-white p-3 rounded-xl hover:bg-blue-700 transition"
+          disabled={loading}
+          className={`w-full py-3 font-semibold text-white rounded-xl transition-all ${
+            loading
+              ? "bg-green-400 cursor-not-allowed"
+              : "bg-green-600 hover:bg-green-700"
+          }`}
         >
-          Đăng ký
+          {loading ? "Đang xử lý..." : "Tạo tài khoản"}
         </button>
       </form>
+
+      <p className="mt-6 text-sm text-center text-gray-500">
+        Đã có tài khoản? <a href="/login" className="text-green-600 hover:underline">Đăng nhập</a>
+      </p>
     </div>
   );
 }

@@ -2,8 +2,9 @@ import { useState, useEffect } from "react";
 import { NavLink, useNavigate } from "react-router-dom";
 import { assets } from "../assets/assets";
 import { Modal, Box, TextField, Button } from "@mui/material";
-import LoginForm from "./LoginForm";
+import { toast } from "react-toastify";
 const Navbar = () => {
+  
   const [open, setOpen] = useState(false);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
@@ -13,7 +14,7 @@ const Navbar = () => {
   const [phone, setPhone] = useState("");
   const [address, setAddress] = useState("");
   const [loading, setLoading] = useState(false);
-  const [hasRegistered, setHasRegistered] = useState(false);
+  const [oldImagePath, setOldImagePath] = useState<string | null>(null);
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
 
@@ -21,28 +22,54 @@ const Navbar = () => {
   const [profileLoading, setProfileLoading] = useState(false);
   const [userInfo, setUserInfo] = useState<any>(null);
 
-  const [showLoginModal, setShowLoginModal] = useState(false);
-
   const [avatarFile, setAvatarFile] = useState<File | null>(null);
   const navigate = useNavigate();
 
   // Kiểm tra login và lấy user info từ localStorage
   useEffect(() => {
-    const checkLogin = () => {
-      const token = localStorage.getItem("accessToken");
-      setIsLoggedIn(!!token);
-      if (!token) {
-        setHasRegistered(false);
-        setUserInfo(null);
+  const fetchUserInfo = async () => {
+    const token = localStorage.getItem("accessToken");
+    const storedUser = localStorage.getItem("user_info");
+
+    if (!token || !storedUser) {
+      setUserInfo(null);
+      setIsLoggedIn(false);
+      return;
+    }
+
+    const { _id } = JSON.parse(storedUser);
+    setIsLoggedIn(true);
+
+    try {
+      const res = await fetch(`http://localhost:5000/users/${_id}`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        setUserInfo(data);
+        localStorage.setItem("user_info", JSON.stringify(data));
       } else {
-        const storedUser = localStorage.getItem("user_info");
-        if (storedUser) setUserInfo(JSON.parse(storedUser));
+        setUserInfo(null);
+        console.error("Không thể lấy thông tin người dùng");
       }
-    };
-    checkLogin();
-    window.addEventListener("storage", checkLogin);
-    return () => window.removeEventListener("storage", checkLogin);
-  }, []);
+    } catch (err) {
+      console.error("Lỗi gọi API người dùng:", err);
+      setUserInfo(null);
+    }
+  };
+
+  fetchUserInfo();
+  window.addEventListener("storage", fetchUserInfo);
+  window.addEventListener("userInfoUpdated", fetchUserInfo);
+
+  return () => {
+    window.removeEventListener("storage", fetchUserInfo);
+    window.removeEventListener("userInfoUpdated", fetchUserInfo);
+  };
+}, []);
 
    // ✅ Listen and update cart count
   useEffect(() => {
@@ -60,20 +87,24 @@ const Navbar = () => {
       window.removeEventListener("storage", updateCartCount);
     };
   }, []);
+    const isValidPhoneNumber = (phone: string) => {
+    return /^\d{10}$/.test(phone);
+  };
   // Hàm thay đổi: mở modal login thay vì navigate đến /login
   const handleAuthClick = () => {
     if (isLoggedIn) {
       localStorage.removeItem("accessToken");
       localStorage.removeItem("user_info");
       setIsLoggedIn(false);
-      setHasRegistered(false);
       setUserInfo(null);
       navigate("/");
       window.dispatchEvent(new Event("storage"));
     } else {
-      setShowLoginModal(true);
+      window.location.href = "/login";
     }
   };
+
+
 
 
   const handleSearch = (e: React.FormEvent) => {
@@ -86,143 +117,156 @@ const Navbar = () => {
   };
 
   // Xử lý trở thành nhà cung cấp
-  const handleRegisterSupplier = async () => {
-    const token = localStorage.getItem("accessToken");
-    if (!token) {
-      navigate("/login");
+ const handleRegisterSupplier = async () => {
+  const token = localStorage.getItem("accessToken");
+  if (!token) {
+    navigate("/login");
+    return;
+  }
+
+  try {
+    const res = await fetch("http://localhost:5000/store-profiles/my-profile", {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+
+    const data = await res.json();
+
+    if (res.status === 200) {
+      const isApproved = data.isApproved === true || data.isApproved === "true";
+      const isRejected = data.isRejected === true || data.isRejected === "true";
+      const isComplete = data.isComplete === true || data.isComplete === "true";
+
+      if (isApproved) {
+        toast.success("Bạn đã là nhà cung cấp được duyệt.");
+        setShowSupplierModal(false);
+        return;
+      }
+
+      if (isRejected) {
+      toast.info("Hồ sơ bị từ chối. Vui lòng chỉnh sửa và gửi lại.");
+      setStoreName(data.storeName || "");
+      setPhone(data.phone || "");
+      setAddress(data.address || "");
+
+      const fullUrl = data.imageUrl?.startsWith("http")
+        ? data.imageUrl
+        : `http://localhost:5000/uploads${data.imageUrl}`;
+      setImagePreview(fullUrl); // để hiển thị
+      setOldImagePath(data.imageUrl || null); 
+
+      setShowSupplierModal(true);
       return;
     }
 
-    try {
-      const res = await fetch("http://localhost:5000/store-profiles/my-profile", {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-
-      if (res.status === 200) {
-        const data = await res.json();
-
-        if (data.isApproved) {
-          alert("Bạn đã là nhà cung cấp được duyệt.");
-          setHasRegistered(true);
-          setShowSupplierModal(false);
-          return;
-        }
-
-        if (data.isComplete) {
-          alert("Bạn đã đăng ký. Vui lòng chờ admin duyệt.");
-          setHasRegistered(true);
-          setShowSupplierModal(false);
-          return;
-        }
-
-        setHasRegistered(false);
-        setStoreName(data.storeName || "");
-        setPhone(data.phone || "");
-        setAddress(data.address || "");
-        setShowSupplierModal(true);
-      } else if (res.status === 404) {
-        setHasRegistered(false);
-        setStoreName("");
-        setPhone("");
-        setAddress("");
-        setShowSupplierModal(true);
-      } else {
-        alert("Lỗi khi kiểm tra trạng thái nhà cung cấp.");
+      if (isComplete) {
+        toast.info("Bạn đã đăng ký rồi. Vui lòng chờ admin duyệt.");
         setShowSupplierModal(false);
+        return;
       }
-    } catch {
-      alert("Lỗi khi lấy thông tin nhà cung cấp.");
+
+      // Nếu không có flag nào khớp, mặc định cho phép đăng ký
+      setStoreName(data.storeName || "");
+      setPhone(data.phone || "");
+      setAddress(data.address || "");
+      setShowSupplierModal(true);
+    } else if (res.status === 404) {
+      // Chưa từng đăng ký
+      setStoreName("");
+      setPhone("");
+      setAddress("");
+      setShowSupplierModal(true);
+    } else {
+      toast.error("Lỗi khi kiểm tra trạng thái nhà cung cấp.");
       setShowSupplierModal(false);
     }
-  };
+  } catch {
+    toast.error("Lỗi khi lấy thông tin nhà cung cấp.");
+    setShowSupplierModal(false);
+  }
+};
 
   // Gửi đăng ký nhà cung cấp
-  const handleSubmitRegister = async () => {
-    if (loading) return;
+const handleSubmitRegister = async () => {
+  if (loading) return;
 
-    if (hasRegistered) {
-      alert("Bạn đã gửi đăng ký rồi, không thể gửi lại.");
-      return;
+  if (!storeName.trim() || !phone.trim() || !address.trim()) {
+    toast.warn("Vui lòng nhập đầy đủ thông tin.");
+    return;
+  }
+
+  if (!isValidPhoneNumber(phone.trim())) {
+    toast.warn("Số điện thoại phải có đúng 10 chữ số.");
+    return;
+  }
+
+  const token = localStorage.getItem("accessToken");
+  if (!token) {
+    navigate("/login");
+    return;
+  }
+
+  setLoading(true);
+  try {
+    const formData = new FormData();
+    formData.append("storeName", storeName.trim());
+    formData.append("phone", phone.trim());
+    formData.append("address", address.trim());
+
+    if (imageFile) {
+      formData.append("image", imageFile);
+    } else if (oldImagePath) {
+      formData.append("imageUrl", oldImagePath);
     }
 
-    if (!storeName.trim() || !phone.trim() || !address.trim()) {
-      alert("Vui lòng nhập đầy đủ thông tin.");
-      return;
+    const response = await fetch("http://localhost:5000/store-profiles", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+      body: formData,
+    });
+
+    const result = await response.json();
+
+    if (response.ok) {
+      toast.success("Đăng ký thành công! Vui lòng chờ admin duyệt.");
+      setShowSupplierModal(false);
+      setStoreName("");
+      setPhone("");
+      setAddress("");
+      setImageFile(null);
+      setImagePreview(null);
+      setOldImagePath(null); 
+    } else {
+      toast.error("Lỗi: " + (result.message || "Không thể gửi đăng ký."));
     }
+  } catch (err) {
+    toast.error("Lỗi hệ thống khi gửi đăng ký!");
+  } finally {
+    setLoading(false);
+  }
+};
 
-    const token = localStorage.getItem("accessToken");
-    if (!token) {
-      navigate("/login");
-      return;
-    }
 
-    setLoading(true);
-    try {
-      const formData = new FormData();
-      formData.append("storeName", storeName.trim());
-      formData.append("phone", phone.trim());
-      formData.append("address", address.trim());
-      if (imageFile) {
-        formData.append("image", imageFile);
-      }
 
-      const response = await fetch("http://localhost:5000/store-profiles", {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-        body: formData,
-      });
-
-      if (response.ok) {
-        alert("Đăng ký thành công! Vui lòng chờ admin duyệt.");
-        setShowSupplierModal(false);
-        setStoreName("");
-        setPhone("");
-        setAddress("");
-        setImageFile(null);
-        setImagePreview(null);
-        setHasRegistered(true);
-      } else {
-        const errorData = await response.json();
-        if (
-          errorData.message &&
-          errorData.message.toLowerCase().includes("đăng ký nhà cung cấp rồi")
-        ) {
-          alert("Bạn đã gửi đăng ký rồi, vui lòng chờ admin duyệt.");
-          setHasRegistered(true);
-          setShowSupplierModal(false);
-        } else {
-          alert("Lỗi: " + (errorData.message || response.statusText));
-        }
-      }
-    } catch {
-      alert("Lỗi hệ thống khi gửi đăng ký!");
-    } finally {
-      setLoading(false);
-    }
-  };
 
   // Cập nhật thông tin cá nhân
  const handleUpdateProfile = async () => {
   const token = localStorage.getItem("accessToken");
   if (!token) {
-    alert("Bạn chưa đăng nhập");
+    toast.error("Bạn chưa đăng nhập");
     navigate("/login");
     return;
   }
 
   if (!userInfo) {
-    alert("Không có thông tin người dùng trong localStorage");
+    toast.warn("Không có thông tin người dùng trong localStorage");
     return;
   }
 
-  const userId = userInfo.sub;
-  console.log("🔎 userInfo:", userInfo);
-  console.log("🔑 userId (from sub):", userId);
-
+  const userId = userInfo._id;
   if (!userId) {
-    alert("Không tìm thấy ID người dùng để cập nhật.");
+    toast.warn("Không tìm thấy ID người dùng để cập nhật.");
     return;
   }
 
@@ -249,25 +293,22 @@ const Navbar = () => {
 
     if (res.ok) {
       const updatedUser = await res.json();
-      console.log("✅ updatedUser từ server:", updatedUser);
 
-      // Giữ lại `sub` nếu backend không trả về
       const newUserInfo = {
         ...updatedUser,
-        sub: userId, // thêm lại sub để lần sau sử dụng
+        _id: userId, 
       };
 
       localStorage.setItem("user_info", JSON.stringify(newUserInfo));
       setUserInfo(newUserInfo);
-      alert("Cập nhật thông tin thành công!");
+      toast.success("Cập nhật thông tin thành công!");
       setShowProfileModal(false);
     } else {
       const err = await res.json();
-      alert("Lỗi cập nhật: " + (err.message || res.statusText));
+      toast.error("Lỗi cập nhật: " + (err.message || res.statusText));
     }
   } catch (err) {
-    console.error("❌ Lỗi hệ thống khi cập nhật hồ sơ:", err);
-    alert("Lỗi hệ thống khi cập nhật hồ sơ!");
+    toast.error("Lỗi hệ thống khi cập nhật hồ sơ!");
   } finally {
     setProfileLoading(false);
   }
@@ -276,13 +317,13 @@ const Navbar = () => {
     <>
        <nav className="flex items-center justify-between px-6 md:px-16 lg:px-24 xl:px-32 py-4 border-b border-gray-300 bg-white relative transition-all">
         <NavLink to="/">
-          <img className="h-9" src={assets.logo} alt="logo" />
+          <img className="h-9" src={assets.logoe} alt="logo" />
         </NavLink>
 
         <div className="hidden sm:flex items-center gap-8">
           <NavLink to="/">Trang chủ</NavLink>
           <NavLink to="/products">Sản phẩm</NavLink>
-          <NavLink to="/">Liên hệ</NavLink>
+          {/* <NavLink to="/">Liên hệ</NavLink> */}
 
           <form
             onSubmit={handleSearch}
@@ -326,10 +367,16 @@ const Navbar = () => {
                 />
               <ul className="hidden group-hover:block absolute top-10 right-0 bg-white shadow border border-gray-200 py-2.5 w-40 rounded-md text-sm z-40">
                 <li
-                  onClick={() => setShowProfileModal(true)}
+                  onClick={() =>  setShowProfileModal(true)}
                   className="p-1.5 pl-3 hover:bg-primary/10 cursor-pointer"
                 >
                   Cập nhật thông tin
+                </li>
+               <li
+                  onClick={() => navigate('/myorder')}
+                  className="p-1.5 pl-3 hover:bg-primary/10 cursor-pointer"
+                >
+                  Đơn hàng
                 </li>
                 <li
                   onClick={handleRegisterSupplier}
@@ -386,152 +433,183 @@ const Navbar = () => {
           </button>
         </div>
       </nav>
-      {/* Modal đăng nhập */}
-      <Modal open={showLoginModal} onClose={() => setShowLoginModal(false)}>
-        <Box className="bg-white p-6 rounded-md shadow-md w-[90%] sm:w-[420px] mx-auto mt-[10%]">
-          <LoginForm
-            onSuccess={() => {
-              setShowLoginModal(false);
-              window.dispatchEvent(new Event("storage")); // cập nhật UI Navbar
-            }}
-          />
-        </Box>
-      </Modal>
-
       {/* Modal đăng ký nhà cung cấp */}
       <Modal open={showSupplierModal} onClose={() => setShowSupplierModal(false)}>
-        <Box className="bg-white p-6 rounded-md shadow-md w-[90%] sm:w-[420px] mx-auto mt-[10%]">
-          <h2 className="text-lg font-semibold mb-4">Đăng ký nhà cung cấp</h2>
+  <Box className="bg-white rounded-2xl shadow-xl w-[90%] sm:w-[420px] mx-auto mt-[5%] p-6 outline-none ring-0">
+    <h2 className="text-2xl font-bold text-center text-gray-800 mb-6">
+      Đăng ký nhà cung cấp
+    </h2>
 
-          <TextField
-            fullWidth
-            label="Tên cửa hàng"
-            value={storeName}
-            onChange={(e) => setStoreName(e.target.value)}
-            className="mb-4"
-          />
+    <div className="flex flex-col gap-5">
+      <TextField
+        fullWidth
+        label="Tên cửa hàng"
+        value={storeName}
+        onChange={(e) => setStoreName(e.target.value)}
+      />
 
-          <TextField
-            fullWidth
-            label="Số điện thoại"
-            value={phone}
-            onChange={(e) => setPhone(e.target.value)}
-            className="mb-4"
-          />
+      <TextField
+        fullWidth
+        label="Số điện thoại"
+        type="tel"
+        inputProps={{ maxLength: 10, pattern: "[0-9]*" }}
+        value={phone}
+        onChange={(e) => setPhone(e.target.value)}
+      />
 
-          <TextField
-            fullWidth
-            label="Địa chỉ"
-            value={address}
-            onChange={(e) => setAddress(e.target.value)}
-            className="mb-4"
-          />
+      <TextField
+        fullWidth
+        label="Địa chỉ"
+        value={address}
+        onChange={(e) => setAddress(e.target.value)}
+      />
 
-          {/* Upload ảnh đại diện */}
-          <input
-            type="file"
-            accept="image/*"
-            onChange={(e) => {
-              const file = e.target.files?.[0];
-              if (file) {
-                setImageFile(file);
-                const reader = new FileReader();
-                reader.onloadend = () => {
-                  setImagePreview(reader.result as string);
-                };
-                reader.readAsDataURL(file);
-              }
-            }}
-            className="mb-4"
-          />
+      <div className="flex flex-col">
+        <label className="text-sm font-medium text-gray-700 mb-1">Ảnh đại diện</label>
+        <input
+          type="file"
+          accept="image/*"
+          onChange={(e) => {
+          const file = e.target.files?.[0];
+          if (file) {
+            setImageFile(file);
+            setOldImagePath(null); // <-- Vì đã có ảnh mới
+            const reader = new FileReader();
+            reader.onloadend = () => {
+              setImagePreview(reader.result as string);
+            };
+            reader.readAsDataURL(file);
+          } else {
+            // Nếu không chọn ảnh mới, vẫn giữ ảnh cũ
+            setImageFile(null);
+            setImagePreview(oldImagePath ? `http://localhost:5000${oldImagePath}` : null);
+          }
+        }}
 
-          {imagePreview && (
-            <img
-              src={imagePreview}
-              alt="Ảnh xem trước"
-              className="w-20 h-20 object-cover rounded-full mb-4"
-            />
-          )}
+          className="file:mr-4 file:py-2 file:px-4
+            file:rounded-md file:border-0
+            file:text-sm file:font-medium
+            file:bg-blue-50 file:text-blue-700
+            hover:file:bg-blue-100
+            text-sm text-gray-600"
+        />
+      </div>
 
-          <Button
-            variant="contained"
-            color="primary"
-            onClick={handleSubmitRegister}
-            disabled={loading || hasRegistered}
-            fullWidth
-          >
-            {loading
-              ? "Đang gửi..."
-              : hasRegistered
-              ? "Đã gửi đăng ký"
-              : "Gửi đăng ký"}
-          </Button>
-        </Box>
-      </Modal>
+      {imagePreview && (
+      <div className="flex justify-center">
+        <img
+          src={imagePreview}
+          alt="Ảnh xem trước"
+          className="w-20 h-20 object-cover rounded-full border border-gray-300 shadow-sm"
+        />
+      </div>
+    )}
+      <Button
+  variant="contained"
+  color="primary"
+  onClick={handleSubmitRegister}
+  disabled={loading}
+  fullWidth
+  className="!mt-2 !bg-green-600 hover:!bg-green-700 transition-all"
+>
+  {loading ? "Đang gửi..." : "Gửi đăng ký"}
+</Button>
+
+    </div>
+  </Box>
+</Modal>
+
 
       {/* Modal cập nhật thông tin người dùng */}
-      <Modal open={showProfileModal} onClose={() => setShowProfileModal(false)}>
-        <Box className="bg-white p-6 rounded-md shadow-md w-[90%] sm:w-[420px] mx-auto mt-[10%]">
-          <h2 className="text-lg font-semibold mb-4">Cập nhật thông tin</h2>
+     <Modal open={showProfileModal} onClose={() => setShowProfileModal(false)}>
+  <Box className="bg-white rounded-2xl shadow-lg w-[90%] sm:w-[420px] mx-auto mt-[5%] p-6 outline-none ring-0">
+    <h2 className="text-2xl font-semibold text-center text-gray-800 mb-6">
+      Cập nhật thông tin
+    </h2>
 
-          <TextField
-            fullWidth
-            label="Tên"
-            value={userInfo?.name || ""}
-            onChange={(e) =>
-              setUserInfo((prev: any) => ({ ...prev, name: e.target.value }))
-            }
-            className="mb-4"
-          />
+    <div className="flex flex-col gap-5">
+      <TextField
+        fullWidth
+        label="Tên"
+        value={userInfo?.name || ""}
+        onChange={(e) =>
+          setUserInfo((prev: any) => ({ ...prev, name: e.target.value }))
+        }
+      />
 
-          <TextField
-            fullWidth
-            label="Số điện thoại"
-            value={userInfo?.phone || ""}
-            onChange={(e) =>
-              setUserInfo((prev: any) => ({ ...prev, phone: e.target.value }))
-            }
-            className="mb-4"
-          />
+      <TextField
+        fullWidth
+        label="Số điện thoại"
+        type="tel"
+        inputProps={{ maxLength: 10, pattern: "[0-9]*" }}
+        value={userInfo?.phone || ""}
+        onChange={(e) =>
+          setUserInfo((prev: any) => ({ ...prev, phone: e.target.value }))
+        }
+      />
 
-          <TextField
-            fullWidth
-            label="Địa chỉ"
-            value={userInfo?.address || ""}
-            onChange={(e) =>
-              setUserInfo((prev: any) => ({ ...prev, address: e.target.value }))
-            }
-            className="mb-4"
-          />
+      <TextField
+        fullWidth
+        label="Địa chỉ"
+        value={userInfo?.address || ""}
+        onChange={(e) =>
+          setUserInfo((prev: any) => ({ ...prev, address: e.target.value }))
+        }
+      />
 
-          {/* Upload ảnh avatar */}
-          <input
-  type="file"
-  accept="image/*"
-  onChange={(e) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    setAvatarFile(file); // lưu file gốc để gửi lên server
-    const reader = new FileReader();
-    reader.onloadend = () => {
-      setUserInfo((prev: any) => ({ ...prev, avatarUrl: reader.result })); // vẫn giữ preview base64
-    };
-    reader.readAsDataURL(file);
-  }}
-  className="mb-4"
-/>
+      <div className="flex flex-col">
+        <label className="text-sm font-medium text-gray-700 mb-1">Ảnh đại diện</label>
+        <input
+          type="file"
+          accept="image/*"
+          onChange={(e) => {
+            const file = e.target.files?.[0];
+            if (!file) return;
+            setAvatarFile(file);
+            const reader = new FileReader();
+            reader.onloadend = () => {
+              setUserInfo((prev: any) => ({ ...prev, avatarUrl: reader.result }));
+            };
+            reader.readAsDataURL(file);
+          }}
+          className="file:mr-4 file:py-2 file:px-4
+            file:rounded-md file:border-0
+            file:text-sm file:font-medium
+            file:bg-blue-50 file:text-blue-700
+            hover:file:bg-blue-100
+            text-sm text-gray-600"
+        />
+      </div>
 
-          <Button
-            variant="contained"
-            color="primary"
-            onClick={handleUpdateProfile}
-            disabled={profileLoading}
-            fullWidth
-          >
-            {profileLoading ? "Đang cập nhật..." : "Cập nhật"}
-          </Button>
-        </Box>
-      </Modal>
+      {userInfo?.avatarUrl && (
+  <div className="flex justify-center">
+    <img
+      src={
+        userInfo.avatarUrl.startsWith("http") || userInfo.avatarUrl.startsWith("data:")
+          ? userInfo.avatarUrl
+          : `http://localhost:5000${userInfo.avatarUrl}`
+      }
+      alt="Avatar Preview"
+      className="w-20 h-20 rounded-full object-cover border border-gray-300 shadow-sm"
+    />
+  </div>
+)}
+
+      <Button
+        variant="contained"
+        color="primary"
+        onClick={handleUpdateProfile}
+        disabled={profileLoading}
+        fullWidth
+        className="!mt-2 !bg-green-600 hover:!bg-green-500 transition-all"
+      >
+        {profileLoading ? "Đang cập nhật..." : "Cập nhật"}
+      </Button>
+    </div>
+  </Box>
+</Modal>
+
+
     </>
   );
 };

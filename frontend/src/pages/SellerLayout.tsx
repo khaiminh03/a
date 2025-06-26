@@ -1,33 +1,39 @@
-import { Link, Outlet, useLocation, useNavigate } from "react-router-dom";
-
+import { Link, Outlet, useLocation} from "react-router-dom";
+import { assets } from "../assets/assets";
+import NotificationBell from "./NotificationBell"; 
 const SellerLayout = () => {
   const location = useLocation();
-  const navigate = useNavigate();
+
 
   const sidebarLinks = [
     { name: "Thêm sản phẩm", path: "/seller/add-product" },
     { name: "Danh sách sản phẩm", path: "/seller/overview" },
-    { name: "Đơn hàng", path: "/seller/chat" },
+    { name: "Sản phẩm bị từ chối", path: "/seller/rejected" },
+    { name: "Đơn hàng", path: "/seller/order" },
+    { name: "Danh thu", path: "/seller/revenue" },
+    { name: "Cập nhật hồ sơ", path: "/seller/profile" },
+
   ];
 
   const handleLogout = () => {
     localStorage.removeItem("accessToken");
     localStorage.removeItem("user_info");
-    navigate("/"); // Quay về trang chủ
+    window.location.replace("/"); 
   };
 
   return (
     <div className="min-h-screen flex flex-col">
       {/* Header */}
       <div className="flex items-center justify-between px-4 md:px-8 border-b border-gray-300 py-3 bg-white transition-all duration-300">
-        <a href="/">
+        <a href="#">
           <img
             className="h-9"
-            src="https://raw.githubusercontent.com/prebuiltui/prebuiltui/main/assets/dummyLogo/dummyLogoColored.svg"
+            src={assets.logoe}
             alt="dummyLogoColored"
           />
         </a>
         <div className="flex items-center gap-5 text-gray-500">
+         <NotificationBell />
           <p>Hi! Supplier</p>
           <button
             onClick={handleLogout}
@@ -48,7 +54,7 @@ const SellerLayout = () => {
               key={index}
               className={`flex items-center py-3 px-4 gap-3 ${
                 location.pathname === item.path
-                  ? "border-r-4 md:border-r-[6px] bg-indigo-500/10 border-indigo-500 text-indigo-500"
+                  ? "border-r-4 md:border-r-[6px] bg-green-500/10 border-green-500 text-green-500"
                   : "hover:bg-gray-100/90 border-white text-gray-700"
               }`}
             >

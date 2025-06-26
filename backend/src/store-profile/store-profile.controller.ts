@@ -1,10 +1,11 @@
-import { Controller, Get, Post, Body, Req, UseGuards, Patch, Param, UploadedFile, UseInterceptors } from '@nestjs/common';
+import {
+  Controller, Get, Post, Body, Req, UseGuards, Patch, Param,
+  UploadedFile, UseInterceptors, UnauthorizedException
+} from '@nestjs/common';
 import { StoreProfileService } from './store-profile.service';
 import { CreateStoreProfileDto } from './dto/create-store-profile.dto';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { Request } from 'express';
-import { RolesGuard } from '../auth/roles.guard';
-import { Roles } from '../auth/roles.decorator';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { diskStorage } from 'multer';
 import { extname } from 'path';
@@ -18,10 +19,14 @@ interface JwtRequest extends Request {
 export class StoreProfileController {
   constructor(private readonly storeProfileService: StoreProfileService) {}
 
-  // Lấy hồ sơ nhà cung cấp của user hiện tại
+  // ======= 1. Hồ sơ của người dùng hiện tại =======
   @UseGuards(JwtAuthGuard)
   @Get('my-profile')
   async getMyProfile(@Req() req: JwtRequest) {
+    if (!req.user?.userId) {
+      throw new UnauthorizedException('Thiếu thông tin người dùng');
+    }
+
     const profile = await this.storeProfileService.findByUserId(req.user.userId);
     if (!profile) {
       return { message: 'Chưa đăng ký nhà cung cấp', isComplete: false, isApproved: false };
@@ -35,11 +40,12 @@ export class StoreProfileController {
       address: profile.address,
       imageUrl: profile.imageUrl,
       isApproved: profile.isApproved,
+      isRejected: profile.isRejected,
       isComplete,
     };
   }
 
-  // Đăng ký nhà cung cấp + upload ảnh đại diện
+  // ======= 2. Tạo hoặc cập nhật hồ sơ nhà cung cấp =======
   @Post()
   @UseGuards(JwtAuthGuard)
   @UseInterceptors(FileInterceptor('image', {
@@ -62,28 +68,30 @@ export class StoreProfileController {
     @Body() dto: CreateStoreProfileDto,
     @UploadedFile() image: Express.Multer.File,
   ) {
-    const imageUrl = image ? `/store-profile/${image.filename}` : '';
+    if (!req.user?.userId) {
+      throw new UnauthorizedException('Thiếu thông tin người dùng');
+    }
+
+    const imageUrl = image
+    ? `/store-profile/${image.filename}`
+    : dto.imageUrl ?? '';
     return this.storeProfileService.createOrUpdate(req.user.userId, {
       ...dto,
       imageUrl,
     });
   }
-
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles('admin')
-  @Get()
-  async findAll() {
-    return this.storeProfileService.findAll();
-  }
-
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles('admin')
+@UseGuards(JwtAuthGuard)
+@Get('admin/all')
+async getAllProfiles() {
+  return this.storeProfileService.findAll();
+}
+  // ======= 3. Duyệt hồ sơ =======
   @Patch(':id/approve')
   async approve(@Param('id') id: string) {
     return this.storeProfileService.approveProfile(id);
   }
 
-  // Lấy hồ sơ nhà cung cấp theo userId (supplierId)
+  // ======= 4. Lấy hồ sơ theo userId hoặc id =======
   @Get('by-user/:userId')
   async findByUserId(@Param('userId') userId: string) {
     const profile = await this.storeProfileService.findByUserId(userId);
@@ -93,7 +101,6 @@ export class StoreProfileController {
     return profile;
   }
 
-  // Nếu bạn muốn lấy hồ sơ nhà cung cấp theo id (profile id)
   @Get(':id')
   async findById(@Param('id') id: string) {
     const profile = await this.storeProfileService.findById(id);
@@ -102,4 +109,14 @@ export class StoreProfileController {
     }
     return profile;
   }
+
+  // ======= 5. Lấy danh sách hồ sơ =======
+  @Get() // Trả về chỉ các hồ sơ đã được duyệt
+  async getApprovedStores() {
+    return this.storeProfileService.findApprovedStores();
+  }
+@Patch(':id/reject')
+async reject(@Param('id') id: string) {
+  return this.storeProfileService.rejectProfile(id);
+}
 }

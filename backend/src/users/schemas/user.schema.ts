@@ -3,10 +3,10 @@ import { Document, Types } from 'mongoose';
 
 @Schema({ timestamps: true })
 export class User {
-  @Prop({ required: true })
-  name: string;
+  @Prop({ required: false })
+  name?: string;
 
-  @Prop({ required: true, unique: true})
+  @Prop({ required: true, unique: true })
   email: string;
 
   @Prop({ required: false })
@@ -26,6 +26,19 @@ export class User {
 
   @Prop({ default: false })
   isGoogleAccount?: boolean;
+
+  @Prop({ default: false })
+  isBlocked?: boolean;
+
+  // ✅ Trường mới để xác thực và reset mật khẩu
+  @Prop({ default: false })
+  isVerified?: boolean;
+
+  @Prop()
+  resetPasswordToken?: string;
+
+  @Prop()
+  resetPasswordExpires?: Date;
 }
 
 export type UserDocument = User & Document & { _id: Types.ObjectId };

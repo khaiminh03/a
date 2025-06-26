@@ -10,6 +10,8 @@ import googleOAuthConfig from './auth/config/google-oauth.config';
 import { OrdersModule } from './orders/orders.module';
 import { StoreProfileModule } from './store-profile/store-profile.module';
 import {ReviewModule} from './reviews/review.module';
+import { PaymentModule } from './payment/payment.module';
+import { NotificationsModule } from './notification/notifications.module';
 
 @Module({
   imports: [
@@ -18,13 +20,17 @@ import {ReviewModule} from './reviews/review.module';
       load: [googleOAuthConfig],
       envFilePath: '.env', 
     }),
-    MongooseModule.forRoot(process.env.MONGODB_URI || 'mongodb://localhost/pet_care_service'),
+    MongooseModule.forRoot(process.env.MONGODB_URI || 'mongodb://localhost/db_ecommerce'),
     CategoryModule,
     ProductsModule,
     AuthModule,
     OrdersModule,
     StoreProfileModule,
     ReviewModule,
+    PaymentModule,
+    NotificationsModule,
+
+    
   ],
   controllers: [AppController],
   providers: [AppService],

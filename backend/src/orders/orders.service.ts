@@ -2,8 +2,10 @@ import { Injectable, BadRequestException, NotFoundException } from '@nestjs/comm
 import { InjectModel } from '@nestjs/mongoose';
 import { Order, OrderDocument } from './schemas/order.schema';
 import { Model, Types } from 'mongoose';
-import { CreateOrderDto } from './dto/create-order.dto';
+import { CreateOrderDto, OrderItemDto} from './dto/create-order.dto';
 import { Product, ProductDocument } from '../products/schemas/product.schema';
+import mongoose from 'mongoose';
+
 
 @Injectable()
 export class OrdersService {
@@ -13,58 +15,83 @@ export class OrdersService {
   ) {}
 
   async create(createOrderDto: CreateOrderDto) {
-    try {
-      // 1. Kiểm tra từng sản phẩm
-      for (const item of createOrderDto.items) {
-        const product = await this.productModel.findById(item.productId);
-        if (!product) {
-          throw new NotFoundException(`Không tìm thấy sản phẩm ID ${item.productId}`);
-        }
+  try {
+    const groupedItems: Record<string, OrderItemDto[]> = {};
 
-        if (product.stock < item.quantity) {
-          throw new BadRequestException(`Sản phẩm ${product.name} không đủ hàng tồn kho`);
-        }
-
-        product.stock -= item.quantity;
-        await product.save();
+    // 1. Kiểm tra tồn kho và gom nhóm theo supplier
+    for (const item of createOrderDto.items) {
+      const product = await this.productModel.findById(item.productId);
+      if (!product) {
+        throw new NotFoundException(`Không tìm thấy sản phẩm ID ${item.productId}`);
       }
 
-      // 2. Chuyển tất cả ID sang ObjectId trước khi lưu
+      if (product.stock < item.quantity) {
+        throw new BadRequestException(`Sản phẩm ${product.name} không đủ hàng tồn kho`);
+      }
+
+      product.stock -= item.quantity;
+      await product.save();
+
+      // Gom nhóm theo supplierId
+      const supplierId = item.supplierId;
+      if (!groupedItems[supplierId]) {
+        groupedItems[supplierId] = [];
+      }
+      groupedItems[supplierId].push(item);
+    }
+
+    const createdOrders: OrderDocument[] = [];
+
+    // 2. Tạo đơn hàng theo từng nhà cung cấp
+    for (const supplierId in groupedItems) {
+      const items = groupedItems[supplierId];
+
+      const totalAmount = items.reduce((sum, item) => sum + item.quantity * item.price, 0);
+
       const orderToSave = {
-        ...createOrderDto,
         customerId: new Types.ObjectId(createOrderDto.customerId),
-        items: createOrderDto.items.map(item => ({
+        items: items.map(item => ({
           ...item,
           productId: new Types.ObjectId(item.productId),
           supplierId: new Types.ObjectId(item.supplierId),
         })),
+        totalAmount,
+        shippingAddress: createOrderDto.shippingAddress,
+        paymentMethod: createOrderDto.paymentMethod,
+        status: 'Chưa thanh toán',
+        shippingStatus: 'Chờ xác nhận',
+        isPaid: false,
+        isReviewed: false,
       };
 
       const order = new this.orderModel(orderToSave);
-      return await order.save();
-    } catch (error) {
-      throw new Error(`Failed to create order: ${error.message}`);
+      const savedOrder = await order.save();
+      createdOrders.push(savedOrder);
     }
-  }
 
-  async getOrdersWithProductDetails() {
-    try {
-      return await this.orderModel
-        .find()
-        .populate({
-          path: 'items.productId',
-          select: 'name images categoryId',
-          populate: {
-            path: 'categoryId',
-            select: 'name',
-          },
-        })
-        .exec();
-    } catch (error) {
-      throw new Error(`Failed to get orders: ${error.message}`);
-    }
+    return createdOrders;
+  } catch (error) {
+    throw new Error(`Failed to create orders: ${error.message}`);
   }
+}
 
+async getOrdersWithProductDetails() {
+  return this.orderModel
+    .find()
+    .populate({
+      path: 'items.productId',
+      select: 'name images price',
+    })
+    .populate({
+      path: 'items.supplierId', // ✅ Thêm dòng này
+      select: 'name', // Lấy tên nhà cung cấp
+    })
+    .populate({
+      path: 'customerId',
+      select: 'name phone email address',
+    })
+    .exec();
+}
   async getOrdersByCustomerId(customerId: string) {
     try {
       return await this.orderModel
@@ -100,17 +127,444 @@ export class OrdersService {
 }
 
    async updateOrderStatus(orderId: string, status: string): Promise<Order> {
-    const allowed = ['Đã đặt hàng', 'Đã xác nhận', 'Đang giao hàng', 'Hoàn thành'];
-    if (!allowed.includes(status)) {
-      throw new BadRequestException('Trạng thái không hợp lệ');
+  const allowed = ['Chưa thanh toán', 'Đã thanh toán']; // ✅ CHỈ trạng thái thanh toán
+  if (!allowed.includes(status)) {
+    throw new BadRequestException('Trạng thái thanh toán không hợp lệ');
+  }
+
+  const order = await this.orderModel.findById(orderId);
+  if (!order) throw new NotFoundException('Không tìm thấy đơn hàng');
+
+  order.status = status;
+  await order.save();
+
+  return order;
+}
+  async updateShippingStatus(orderId: string, shippingStatus: string): Promise<Order> {
+  const allowed = ['Chờ xác nhận', 'Đã xác nhận', 'Đang giao hàng','Giao thất bại', 'Hoàn thành'];
+  if (!allowed.includes(shippingStatus)) {
+    throw new BadRequestException('Trạng thái vận chuyển không hợp lệ');
+  }
+
+  const order = await this.orderModel.findById(orderId);
+  if (!order) throw new NotFoundException('Không tìm thấy đơn hàng');
+
+  order.shippingStatus = shippingStatus;
+
+
+  if (shippingStatus === 'Hoàn thành') {
+    order.status = 'Đã thanh toán';
+    order.isPaid = true;
+  }
+
+  await order.save();
+  return order;
+}
+async cancelOrder(orderId: string) {
+  const order = await this.orderModel.findById(orderId);
+  if (!order) throw new Error('Không tìm thấy đơn hàng');
+
+  if (order.status === 'Đã thanh toán') {
+    throw new Error('Không thể hủy đơn hàng đã thanh toán');
+  }
+  if (order.status === 'Đã huỷ') {
+    throw new BadRequestException('Đơn hàng đã bị hủy trước đó');
+  }
+
+  order.status = 'Đã huỷ';
+  order.shippingStatus = "Đã hủy";
+  await order.save();
+
+  return this.findById(orderId); 
+}
+async updateOrder(orderId: string, updates: Partial<Order>): Promise<Order> {
+  const order = await this.orderModel.findById(orderId);
+  if (!order) throw new NotFoundException('Không tìm thấy đơn hàng');
+
+  Object.assign(order, updates);
+  return await order.save();
+}
+
+   // danh thu 
+   async calculateRevenueBySupplier(
+    supplierId: string,
+    from?: string,
+    to?: string,
+  ) {
+    const match: any = {
+      'items.supplierId': new mongoose.Types.ObjectId(supplierId),
+      shippingStatus: 'Hoàn thành',
+    };
+
+    if (from && to) {
+      match.createdAt = {
+        $gte: new Date(from),
+        $lte: new Date(to),
+      };
     }
 
-    const order = await this.orderModel.findById(orderId);
-    if (!order) throw new NotFoundException('Không tìm thấy đơn hàng');
+    const result = await this.orderModel.aggregate([
+      { $unwind: '$items' },
+      { $match: match },
+      {
+        $group: {
+          _id: null,
+          totalRevenue: { $sum: { $multiply: ['$items.quantity', '$items.price'] } },
+          totalOrders: { $addToSet: '$_id' }, // tránh trùng đơn hàng
+          totalProductsSold: { $sum: '$items.quantity' },
+        },
+      },
+      {
+        $project: {
+          _id: 0,
+          totalRevenue: 1,
+          totalOrdersCount: { $size: '$totalOrders' },
+          totalProductsSold: 1,
+        },
+      },
+    ]);
 
-    order.status = status;
-    await order.save();
-
-    return order;
+    return result[0] || {
+      totalRevenue: 0,
+      totalOrdersCount: 0,
+      totalProductsSold: 0,
+    };
   }
+//
+async markAsPaid(orderId: string): Promise<OrderDocument> {
+  const order = await this.orderModel.findById(orderId);
+  if (!order) {
+    throw new NotFoundException('Không tìm thấy đơn hàng');
+  }
+
+  order.isPaid = true;
+  order.status = 'Đã thanh toán';
+  order.shippingStatus = order.shippingStatus || 'Chờ xác nhận'; // mặc định shipping nếu chưa có
+  return await order.save();
 }
+// async findById(orderId: string) {
+//   return this.orderModel.findById(orderId).exec();
+// }
+async findById(orderId: string) {
+  return this.orderModel
+    .findById(orderId)
+    .populate({
+      path: 'items.productId',
+      select: 'name images categoryId',
+      populate: {
+        path: 'categoryId',
+        select: 'name',
+      },
+    })
+    .populate({
+      path: 'items.supplierId',
+      select: 'name',
+    })
+    .populate({
+      path: 'customerId',
+      select: 'name phone email address',
+    })
+    .exec();
+}
+
+
+
+///
+async getDailyRevenue(supplierId: string, from?: string, to?: string) {
+  const match: any = {
+    'items.supplierId': new Types.ObjectId(supplierId),
+    shippingStatus: 'Hoàn thành',
+  };
+  if (from && to) {
+    match.createdAt = { $gte: new Date(from), $lte: new Date(to) };
+  }
+
+  return this.orderModel.aggregate([
+    { $unwind: '$items' },
+    { $match: match },
+    {
+      $group: {
+        _id: { $dateToString: { format: '%Y-%m-%d', date: '$createdAt' } },
+        revenue: { $sum: { $multiply: ['$items.quantity', '$items.price'] } },
+      },
+    },
+    {
+      $project: {
+        date: '$_id',
+        revenue: 1,
+        _id: 0,
+      },
+    },
+    { $sort: { date: 1 } },
+  ]);
+}
+
+  async getTopProducts(supplierId: string, from?: string, to?: string) {
+  const match: any = {
+    'items.supplierId': new Types.ObjectId(supplierId),
+    shippingStatus: 'Hoàn thành',
+  };
+  if (from && to) {
+    match.createdAt = { $gte: new Date(from), $lte: new Date(to) };
+  }
+
+  return this.orderModel.aggregate([
+    { $unwind: '$items' },
+    { $match: match },
+    {
+      $group: {
+        _id: '$items.productId',
+        sold: { $sum: '$items.quantity' },
+      },
+    },
+    {
+      $lookup: {
+        from: 'products',
+        localField: '_id',
+        foreignField: '_id',
+        as: 'product',
+      },
+    },
+    { $unwind: '$product' },
+    {
+      $project: {
+        name: '$product.name',
+        sold: 1,
+        _id: 0,
+      },
+    },
+    { $sort: { sold: -1 } },
+    { $limit: 5 },
+  ]);
+}
+  async getOrderStatusSummary(supplierId: string, from?: string, to?: string) {
+  const match: any = {
+    'items.supplierId': new Types.ObjectId(supplierId),
+  };
+  if (from && to) {
+    match.createdAt = { $gte: new Date(from), $lte: new Date(to) };
+  }
+
+  return this.orderModel.aggregate([
+    { $unwind: '$items' },
+    { $match: match },
+    {
+      $group: {
+        _id: '$shippingStatus',
+        count: { $sum: 1 },
+      },
+    },
+    {
+      $project: {
+        status: '$_id',
+        count: 1,
+        _id: 0,
+      },
+    },
+  ]);
+}
+// doanh thu admin
+// Tổng doanh thu theo ngày, tháng, năm
+async getRevenueSummaryByPeriod(unit: 'day' | 'month' | 'year') {
+  const formatMap = {
+    day: '%Y-%m-%d',
+    month: '%Y-%m',
+    year: '%Y',
+  };
+  const format = formatMap[unit];
+
+  return this.orderModel.aggregate([
+    { $match: { shippingStatus: 'Hoàn thành' } },
+    { $unwind: '$items' },
+    {
+      $group: {
+        _id: { $dateToString: { format, date: '$createdAt' } },
+        revenue: { $sum: { $multiply: ['$items.quantity', '$items.price'] } },
+      },
+    },
+    { $project: { date: '$_id', revenue: 1, _id: 0 } },
+    { $sort: { date: 1 } },
+  ]);
+}
+//Doanh thu theo nhà cung cấp
+async getRevenueGroupedBySuppliers() {
+  return this.orderModel.aggregate([
+    { $match: { shippingStatus: 'Hoàn thành' } },
+    { $unwind: '$items' },
+    {
+      $group: {
+        _id: '$items.supplierId',
+        revenue: { $sum: { $multiply: ['$items.quantity', '$items.price'] } },
+        productsSold: { $sum: '$items.quantity' },
+      },
+    },
+    {
+      $lookup: {
+        from: 'users',
+        localField: '_id',
+        foreignField: '_id',
+        as: 'supplier',
+      },
+    },
+    { $unwind: '$supplier' },
+    {
+      $project: {
+        supplierId: '$_id',
+        revenue: 1,
+        productsSold: 1,
+        name: '$supplier.name',
+        email: '$supplier.email',
+      },
+    },
+  ]);
+}
+//Tổng số đơn hàng và đơn hàng đã hoàn thành
+async getOrderCountSummary() {
+  const [total, completed] = await Promise.all([
+    this.orderModel.countDocuments(),
+    this.orderModel.countDocuments({ shippingStatus: 'Hoàn thành' }),
+  ]);
+
+  return {
+    totalOrders: total,
+    completedOrders: completed,
+  };
+}
+// Tổng số sản phẩm đã được đăng bán
+async getTotalApprovedProducts() {
+  return this.productModel.countDocuments({ isActive: true, status: 'approved' });
+}
+// Số lượng hàng tồn kho theo loại nông sản
+async getStockByCategory() {
+  return this.productModel.aggregate([
+    {
+      $group: {
+        _id: '$categoryId',
+        totalStock: { $sum: '$stock' },
+      },
+    },
+    {
+      $lookup: {
+        from: 'categories',
+        localField: '_id',
+        foreignField: '_id',
+        as: 'category',
+      },
+    },
+    { $unwind: '$category' },
+    {
+      $project: {
+        categoryName: '$category.name',
+        totalStock: 1,
+        _id: 0,
+      },
+    },
+  ]);
+}
+// admin 
+async getAllOrderStatusSummary(from?: string, to?: string): Promise<{ status: string; count: number }[]> {
+  const match: any = {};
+  
+  if (from && to) {
+    match.createdAt = {
+      $gte: new Date(from),
+      $lte: new Date(to),
+    };
+  }
+
+  const result = await this.orderModel.aggregate([
+    { $match: match },
+    {
+      $group: {
+        _id: '$shippingStatus',
+        count: { $sum: 1 },
+      },
+    },
+    {
+      $project: {
+        status: '$_id',
+        count: 1,
+        _id: 0,
+      },
+    },
+  ]);
+
+  return result;
+}
+
+async getTopProductsAllSystem(from?: string, to?: string, limit: number = 10) {
+  const match: any = { shippingStatus: 'Hoàn thành' };
+  if (from && to) {
+    match.createdAt = { $gte: new Date(from), $lte: new Date(to) };
+  }
+
+  return this.orderModel.aggregate([
+    { $unwind: '$items' },
+    { $match: match },
+    {
+      $group: {
+        _id: '$items.productId',
+        sold: { $sum: '$items.quantity' },
+      },
+    },
+    {
+      $lookup: {
+        from: 'products',
+        localField: '_id',
+        foreignField: '_id',
+        as: 'product',
+      },
+    },
+    { $unwind: '$product' },
+    {
+      $project: {
+        name: '$product.name',
+        sold: 1,
+        _id: 0,
+      },
+    },
+    { $sort: { sold: -1 } },
+    { $limit: limit },
+  ]);
+}
+
+async getBestSellingProducts(limit: number = 5) {
+  return this.orderModel.aggregate([
+    { $unwind: '$items' },
+    { $match: { shippingStatus: 'Hoàn thành' } },
+    {
+      $group: {
+        _id: '$items.productId',
+        totalSold: { $sum: '$items.quantity' },
+      },
+    },
+    { $sort: { totalSold: -1 } },
+    { $limit: limit },
+    {
+      $lookup: {
+        from: 'products',
+        localField: '_id',
+        foreignField: '_id',
+        as: 'product',
+      },
+    },
+    { $unwind: '$product' },
+    // ⚠️ Chỉ lấy sản phẩm đã được duyệt (approved)
+    {
+      $match: {
+        'product.status': 'approved',
+      },
+    },
+    {
+      $project: {
+        _id: 0,
+        productId: '$_id',
+        name: '$product.name',
+        images: '$product.images',
+        totalSold: 1,
+      },
+    },
+  ]);
+}
+}
+

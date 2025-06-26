@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { toast } from 'react-toastify';
+import { assets } from '../assets/assets';
+
 interface ProductCardProps {
   product: {
     _id: string;
@@ -9,7 +11,9 @@ interface ProductCardProps {
     originalPrice?: number;
     images: string[];
     categoryId: string;
+    stock: number;
   };
+  onAddToCart?: () => void;
 }
 
 const ProductCard = ({ product }: ProductCardProps) => {
@@ -20,7 +24,7 @@ const ProductCard = ({ product }: ProductCardProps) => {
       try {
         const response = await fetch(`http://localhost:5000/categories/${product.categoryId}`);
         const categoryData = await response.json();
-        setCategoryName(categoryData.name); // Assuming the response contains a 'name' field
+        setCategoryName(categoryData.name);
       } catch (error) {
         console.error('Error fetching category:', error);
       }
@@ -30,37 +34,42 @@ const ProductCard = ({ product }: ProductCardProps) => {
   }, [product.categoryId]);
 
   const handleAdd = () => {
+     if (product.stock === 0) {
+    toast.error(`"${product.name}" hiện đã hết hàng.`);
+    return;
+  }
     const cart = JSON.parse(localStorage.getItem("cart") || "[]");
     const existingProductIndex = cart.findIndex((item: any) => item._id === product._id);
 
     if (existingProductIndex >= 0) {
-      cart[existingProductIndex].quantity += 1;  // Tăng số lượng nếu sản phẩm đã có trong giỏ
+      cart[existingProductIndex].quantity += 1;
     } else {
-      cart.push({ ...product, quantity: 1 });  // Thêm sản phẩm với số lượng 1
+      cart.push({ ...product, quantity: 1 });
     }
 
     localStorage.setItem("cart", JSON.stringify(cart));
-    toast.success(`Đã thêm "${product.name}" vào giỏ hàng!`);  // Lưu giỏ hàng đã cập nhật
+
+    //  Phát sự kiện để Navbar nhận biết cập nhật
+    window.dispatchEvent(new Event("cartUpdated"));
+
+    toast.success(`Đã thêm "${product.name}" vào giỏ hàng!`);
   };
 
- const formatPrice = (price: number): string => {
-  return price.toLocaleString("vi-VN") + "đ";
-};
-
-
+  const formatPrice = (price: number): string => {
+    return price.toLocaleString("vi-VN") + "đ";
+  };
 
   return (
     <div className="border border-gray-500/20 rounded-md md:px-4 px-3 py-2 bg-white min-w-56 max-w-56 w-full">
-      <Link
-        to={`/product/${product._id}`}
-        className="group cursor-pointer flex items-center justify-center px-2"
-      >
-        <img
-          src={`http://localhost:5000/uploads/products/${product.images[0]}`}
-          alt={product.name}
-          className="group-hover:scale-105 transition max-w-26 md:max-w-36"
-        />
-      </Link>
+      <div className="group cursor-pointer flex items-center justify-center px-2">
+        <Link to={`/product/${product._id}`} className="group cursor-pointer flex items-center justify-center px-2">
+          <img
+            src={`http://localhost:5000/uploads/products/${product.images[0]}`}
+            alt={product.name}
+            className="group-hover:scale-105 transition max-w-26 md:max-w-36"
+          />
+        </Link>
+      </div>
       <div className="text-gray-500/60 text-sm">
         <p>{categoryName}</p>
         <h2 className="text-gray-700 font-medium text-lg truncate w-full">{product.name}</h2>
@@ -69,14 +78,16 @@ const ProductCard = ({ product }: ProductCardProps) => {
           {product.originalPrice && (
             <span className="text-gray-400 line-through text-sm">{formatPrice(product.originalPrice)}</span>
           )}
+          <div className="text-indiago-500">
+            <button
+              onClick={handleAdd}
+              className="flex items-center justify-center gap-1 bg-green-100 border border-green-300 md:w-[80px] w-[64px] h-[34px] rounded text-green-600 font-medium"
+            >
+              <img src={assets.cart_icon} alt="Giỏ hàng" />
+              Thêm
+            </button>
+          </div>
         </div>
-
-        <button
-          onClick={handleAdd}
-          className="mt-4 w-full py-2 border border-green-400 text-green-500 bg-green-50 rounded-xl text-sm font-semibold transition-all"
-        >
-          Thêm
-        </button>
       </div>
     </div>
   );

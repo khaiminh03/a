@@ -10,6 +10,7 @@ import {
   Delete,
   UploadedFile,
   UseInterceptors,
+  BadRequestException,
 } from '@nestjs/common';
 import { UserService } from './user.service';
 import { CreateUserDto } from './dto/create-user.dto';
@@ -89,10 +90,31 @@ async updateUser(
 
   return this.userService.update(id, dto);
 }
-
-
   @Delete(':id')
   remove(@Param('id') id: string) {
     return this.userService.remove(id);
   }
+  // Lấy toàn bộ user (có thể lọc theo role) - chỉ admin
+@UseGuards(JwtAuthGuard)
+@Get('admin/list')
+async getAllUsers(@Req() req: JwtRequest, @Body('role') role?: string) {
+  if (req.user.role !== 'admin') {
+    throw new BadRequestException('Bạn không có quyền');
+  }
+  return this.userService.getAllUsers(role);
+}
+
+// Khóa hoặc mở khóa user - chỉ admin
+@UseGuards(JwtAuthGuard)
+@Patch('admin/block/:id')
+async blockUser(
+  @Req() req: JwtRequest,
+  @Param('id') id: string,
+  @Body('block') block: boolean,
+) {
+  if (req.user.role !== 'admin') {
+    throw new BadRequestException('Bạn không có quyền');
+  }
+  return this.userService.toggleBlockUser(id, block);
+}
 }

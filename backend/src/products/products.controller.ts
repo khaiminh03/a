@@ -1,6 +1,6 @@
 import {
   Controller, Post, Get, Query, Patch, Param, Body, Delete,
-  UploadedFiles, UploadedFile, UseInterceptors, NotFoundException
+  UploadedFiles, UploadedFile, UseInterceptors, NotFoundException, BadRequestException
 } from '@nestjs/common';
 import { FilesInterceptor, FileInterceptor } from '@nestjs/platform-express';
 import { diskStorage } from 'multer';
@@ -40,7 +40,18 @@ export class ProductsController {
     });
   }
 
-  // Tìm kiếm sản phẩm theo từ khóa
+  @Get('admin')
+async getByAdminStatus(@Query('status') status: string): Promise<Product[]> {
+  if (!status || !['pending', 'rejected', 'approved'].includes(status)) {
+    throw new BadRequestException('Trạng thái không hợp lệ. Chỉ chấp nhận: pending, rejected, approved.');
+  }
+
+  return this.productsService.findWithFilter({
+    isActive: true,
+    status,
+  });
+}
+   // Tìm kiếm sản phẩm theo từ khóa
   @Get('search')
   async search(@Query('keyword') keyword: string): Promise<Product[]> {
     if (!keyword || keyword.trim() === '') return [];
@@ -127,4 +138,62 @@ export class ProductsController {
 
     return { filename: file.filename };
   }
+// @Get('slug/:slug')
+// async findBySlug(@Param('slug') slug: string): Promise<Product> {
+//   const product = await this.productsService.findBySlug(slug);
+
+//   if (!product) {
+//     throw new NotFoundException(`Product with slug "${slug}" not found`);
+//   }
+
+//   return product;
+// }
+@Get('admin/pending')
+async getPendingProducts(): Promise<Product[]> {
+  return this.productsService.findWithFilter({
+    isActive: true,
+    status: 'pending',
+  });
+}
+
+ @Patch(':id/status')
+async updateStatus(
+  @Param('id') id: string,
+  @Body() updateProductDto: UpdateProductDto,
+): Promise<Product> {
+  const { status, rejectionReason } = updateProductDto;
+
+  // Kiểm tra nếu status không hợp lệ
+  if (!status || !['approved', 'rejected'].includes(status)) {
+    throw new BadRequestException('Trạng thái không hợp lệ. Chỉ chấp nhận "approved" hoặc "rejected".');
+  }
+
+  // Nếu từ chối thì bắt buộc có lý do
+  if (status === 'rejected' && (!rejectionReason || rejectionReason.trim() === '')) {
+    throw new BadRequestException('Cần cung cấp lý do từ chối sản phẩm.');
+  }
+
+  return this.productsService.updateById(id, updateProductDto);
+}
+@Get('by-supplier/:supplierId/rejected')
+async getRejectedProductsBySupplier(
+  @Param('supplierId') supplierId: string,
+): Promise<Product[]> {
+  return this.productsService.findWithFilter({
+    supplierId: new Types.ObjectId(supplierId),
+    status: 'rejected',
+    isActive: true,
+  });
+}
+// san pham tuong tu 
+@Get(':id/similar')
+async getSimilar(@Param('id') id: string): Promise<Product[]> {
+  const product = await this.productsService.findOne(id);
+  if (!product) {
+    throw new NotFoundException(`Product with id ${id} not found`);
+  }
+
+  return this.productsService.getSimilarProducts(product.categoryId.toString(), id);
+}
+
 }

@@ -1,9 +1,11 @@
+// ... các import giữ nguyên
 import { useEffect, useState } from "react";
 import Modal from "@mui/material/Modal";
 import Box from "@mui/material/Box";
 import Rating from "@mui/material/Rating";
 import TextField from "@mui/material/TextField";
 import Button from "@mui/material/Button";
+import { toast } from "react-toastify";
 
 interface Category {
   name: string;
@@ -27,6 +29,7 @@ interface Order {
   paymentMethod: string;
   totalAmount: number;
   status: string;
+  shippingStatus: string;
   createdAt: string;
   items: OrderItem[];
 }
@@ -67,41 +70,29 @@ const MyOrders = () => {
     try {
       const res = await fetch("http://localhost:5000/reviews", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           productId: selectedProductId,
           orderId: selectedOrderId,
           rating,
           comment,
+          accessToken: token,
         }),
       });
 
-      if (res.status === 401) {
-        alert("Bạn cần đăng nhập để đánh giá.");
-        return;
-      }
-
       if (res.ok) {
-        alert("Đánh giá thành công!");
+        toast.success("Đánh giá thành công");
         setOpen(false);
         setComment("");
         setRating(5);
 
-        const updatedOrders = orders.map((order) => {
-          if (order._id === selectedOrderId) {
-            order.items = order.items.map((item) => {
-              if (String(item.productId._id) === selectedProductId) {
-                return { ...item, isReviewed: true };
-              }
-              return item;
-            });
-          }
-          return order;
-        });
-        setOrders(updatedOrders);
+        const updatedOrderRes = await fetch(`http://localhost:5000/orders/${selectedOrderId}`);
+        if (updatedOrderRes.ok) {
+          const updatedOrder = await updatedOrderRes.json();
+          setOrders((prevOrders) =>
+            prevOrders.map((o) => (o._id === updatedOrder._id ? updatedOrder : o))
+          );
+        }
       } else {
         const error = await res.json();
         alert("Lỗi: " + (error.message || "Đánh giá thất bại!"));
@@ -113,78 +104,114 @@ const MyOrders = () => {
     }
   };
 
+  const handleCancelOrder = async (orderId: string) => {
+    const confirmCancel = window.confirm("Bạn có chắc muốn hủy đơn hàng này không?");
+    if (!confirmCancel) return;
+
+    try {
+      const res = await fetch(`http://localhost:5000/orders/${orderId}/cancel`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+      });
+
+      if (res.ok) {
+        toast.success("Đã hủy đơn hàng");
+        const updated = await res.json();
+        setOrders((prev) => prev.map((o) => (o._id === updated._id ? updated : o)));
+      } else {
+        toast.error("Không thể hủy đơn hàng");
+      }
+    } catch {
+      toast.error("Lỗi khi hủy đơn hàng");
+    }
+  };
+
   return (
     <div className="mt-16 pb-16 px-4 max-w-5xl mx-auto">
       <div className="flex flex-col items-start mb-8">
-        <p className="text-2xl font-bold uppercase">Đơn hàng của bạn</p>
-        <div className="w-16 h-0.5 bg-indigo-600 rounded-full"></div>
+        <p className="text-2xl font-bold uppercase text-gray-800">Đơn hàng của bạn</p>
+        <div className="w-16 h-0.5 bg-green-600 rounded-full mt-1"></div>
       </div>
 
       {orders.length === 0 ? (
         <p className="text-gray-500">Bạn chưa có đơn hàng nào.</p>
       ) : (
         orders.map((order) => (
-          <div
-            key={order._id}
-            className="flex flex-col border border-gray-200 rounded-lg p-6 mb-6 shadow-sm"
-          >
-            <p className="text-sm text-gray-500 mb-2">
-              <strong>OrderId :</strong> {order._id} - <strong>Trạng thái:</strong> {order.status}
-            </p>
+          <div key={order._id} className="border border-gray-300 bg-white rounded-xl shadow-sm p-5 mb-6 space-y-4">
+            <div className="text-sm text-gray-500">
+              <strong>Mã đơn:</strong> {order._id}
+            </div>
 
             {order.items.map((item, idx) => (
-              <div key={idx} className="flex gap-4 mb-4">
-                <div className="w-24 h-24 bg-gray-100 flex items-center justify-center rounded overflow-hidden border">
-                  <img
-                    src={
-                      item.productId?.images?.[0]
+              <div key={idx} className="grid grid-cols-1 md:grid-cols-3 gap-4 items-start  pt-4">
+                <div className="space-y-2 col-span-2">
+                  <div className="flex gap-3 items-center">
+                    <img
+                      src={item.productId?.images?.[0]
                         ? `http://localhost:5000/uploads/products/${item.productId.images[0]}`
-                        : "/no-image.png"
-                    }
-                    alt={item.productId?.name || "Product"}
-                    className="object-cover w-full h-full"
-                  />
+                        : "/no-image.png"}
+                      alt="product"
+                      className="w-16 h-16 object-cover rounded border border-gray-500/30"
+                    />
+                    <div>
+                      <p className="font-semibold">{item.productId?.name}</p>
+                      <p className="text-sm text-gray-500">Danh mục: {item.productId?.categoryId?.name || "N/A"}</p>
+                      <p className="text-sm text-gray-500">Số lượng: {item.quantity}</p>
+                    </div>
+                  </div>
                 </div>
 
-                <div className="flex flex-col justify-between">
-                  <p className="text-lg font-semibold text-gray-900">{item.productId?.name || "Product"}</p>
-                  <p className="text-sm text-gray-500">
-                    Category: {item.productId?.categoryId?.name || "N/A"}
-                  </p>
-                  <p className="text-sm">Số lượng: {item.quantity}</p>
-
-                  {item.isReviewed ? (
-                    <p className="text-green-600 text-sm mt-1">✅ Đã đánh giá</p>
-                  ) : order.status === "Hoàn thành" && (
-                    <button
-                      onClick={() => {
-                        setOpen(true);
-                        setSelectedProductId(item.productId?._id || null);
-                        setSelectedOrderId(order._id);
-                      }}
-                      className="mt-2 px-3 py-1 text-sm bg-indigo-600 text-white rounded hover:bg-indigo-700 w-fit"
-                    >
-                      Đánh giá
-                    </button>
-                  )}
-                </div>
+                {order.status === "Đã thanh toán" && order.shippingStatus === "Hoàn thành" && (
+                  <div className="flex justify-end items-center">
+                    {item.isReviewed ? (
+                      <span className="text-green-600 font-medium">Đã đánh giá</span>
+                    ) : (
+                      <button
+                        onClick={() => {
+                          setSelectedProductId(item.productId?._id || null);
+                          setSelectedOrderId(order._id);
+                          setOpen(true);
+                        }}
+                        className="px-4 py-1 bg-green-600 text-white rounded text-sm hover:bg-green-700"
+                      >
+                        Đánh giá
+                      </button>
+                    )}
+                  </div>
+                )}
               </div>
             ))}
 
-            <div className="text-sm text-gray-600 text-right">
-              <p>Ngày: {new Date(order.createdAt).toLocaleDateString()}</p>
-              <p><strong>Phương thức thanh toán:</strong> {order.paymentMethod}</p>
-              <p className="text-green-600 font-semibold text-base mt-1">
-                Tổng cộng: ${order.totalAmount}
-              </p>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm text-gray-700">
+              <div className="space-y-1">
+                <p><strong>Phương thức:</strong> {order.paymentMethod}</p>
+                <p><strong>Vận chuyển:</strong> {order.shippingStatus}</p>
+                <p><strong>Trạng thái:</strong> {order.status}</p>
+                <p><strong>Ngày:</strong> {new Date(order.createdAt).toLocaleDateString()}</p>
+              </div>
+              <div className="flex justify-end items-end text-green-600 font-bold text-base">
+                Thành tiền: {order.totalAmount.toLocaleString("vi-VN")} ₫
+              </div>
             </div>
+
+            {order.status === "Chưa thanh toán" &&
+            (order.shippingStatus === "Chờ xác nhận" || order.shippingStatus === "Đã xác nhận") && (
+              <div className="text-right">
+                <button
+                  onClick={() => handleCancelOrder(order._id)}
+                  className="mt-2 px-5 py-2 bg-red-600 text-white rounded hover:bg-red-700 text-sm"
+                >
+                  Hủy đơn hàng
+                </button>
+              </div>
+            )}
           </div>
         ))
       )}
 
       <Modal open={open} onClose={() => setOpen(false)}>
-        <Box sx={{ p: 4, bgcolor: "white", width: 400, mx: "auto", mt: "15vh", borderRadius: 2 }}>
-          <h2 className="text-xl font-semibold mb-4">Đánh giá sản phẩm</h2>
+        <Box className="bg-white w-[90%] max-w-md mx-auto mt-[12vh] p-6 rounded-xl shadow-xl">
+          <h2 className="text-xl font-semibold mb-4 text-center">Đánh giá sản phẩm</h2>
           <Rating value={rating} onChange={(_, newValue) => setRating(newValue)} />
           <TextField
             label="Nội dung đánh giá"
@@ -195,7 +222,12 @@ const MyOrders = () => {
             onChange={(e) => setComment(e.target.value)}
             className="mt-4"
           />
-          <Button onClick={handleSubmitReview} variant="contained" sx={{ mt: 2 }} disabled={loading}>
+          <Button
+            onClick={handleSubmitReview}
+            variant="contained"
+            className="!bg-green-600 hover:!bg-green-700 w-full mt-4"
+            disabled={loading}
+          >
             {loading ? "Đang gửi..." : "Gửi đánh giá"}
           </Button>
         </Box>

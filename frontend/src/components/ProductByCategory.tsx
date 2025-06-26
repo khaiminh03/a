@@ -9,6 +9,7 @@ interface Product {
   price: number;
   originalPrice?: number;
   images: string[];
+  categoryId: string;
 }
 
 const ProductsByCategory = () => {

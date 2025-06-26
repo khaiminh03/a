@@ -1,5 +1,5 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
-import { Document, Types } from 'mongoose';
+import { HydratedDocument, Types } from 'mongoose';
 
 @Schema({ _id: false })
 export class OrderItem {
@@ -39,17 +39,23 @@ export class Order {
   @Prop({ required: true })
   paymentMethod: string;
 
-  @Prop() 
-  status?: string;
+  @Prop({
+  enum: ['Chưa thanh toán', 'Đã thanh toán', 'Đã huỷ'],
+  default: 'Chưa thanh toán',
+  })
+  status: string;
+
+  @Prop({ enum: ['Chờ xác nhận', 'Đã xác nhận', 'Đang giao hàng','Giao thất bại', 'Hoàn thành', 'Đã hủy'], 
+  default: 'Chờ xác nhận' })
+  shippingStatus: string;
 
   @Prop({ default: false })
   isPaid: boolean;
 
-  @Prop({ default: false }) // <-- Thêm dòng này
+  @Prop({ default: false }) 
   isReviewed?: boolean;
-  
-}
 
-export type OrderDocument = Order & Document;
+}
+export type OrderDocument = HydratedDocument<Order>;
 
 export const OrderSchema = SchemaFactory.createForClass(Order);

@@ -4,10 +4,16 @@ import { Model } from 'mongoose';
 import { User, UserDocument } from './schemas/user.schema'
 import { CreateUserDto } from './dto/create-user.dto'
 import { UpdateUserDto } from './dto/update-user.dto'
+import { Product } from '../products/schemas/product.schema';
 import * as bcrypt from 'bcrypt';
+import { Types } from 'mongoose';
 @Injectable()
 export class UserService {
-  constructor(@InjectModel(User.name) private userModel: Model<UserDocument>) {}
+  constructor(
+    @InjectModel(User.name) private userModel: Model<UserDocument>,
+    @InjectModel(Product.name) private productModel: Model<Product>,
+
+) {}
   async create(createUserDto: CreateUserDto): Promise<UserDocument> {
   // 🔎 Kiểm tra email đã tồn tại chưa
   const existingUser = await this.userModel.findOne({ email: createUserDto.email });
@@ -101,6 +107,37 @@ async becomeSupplier(userId: string, phone: string, address: string): Promise<Us
 
   return updatedUser;
 }
-  
+  async toggleBlockUser(userId: string, block: boolean): Promise<UserDocument> {
+  const updatedUser = await this.userModel.findByIdAndUpdate(
+    userId,
+    { isBlocked: block },
+    { new: true },
+  );
+
+  if (!updatedUser) {
+    throw new NotFoundException('User không tồn tại');
+  }
+   // 👇 Nếu là nhà cung cấp thì cập nhật trạng thái sản phẩm của họ
+    if (updatedUser.role === 'supplier') {
+      await this.productModel.updateMany(
+        { supplierId: new Types.ObjectId(userId) },
+        { $set: { status: block ? 'hidden' : 'approved' } }
+      );
+    }
+
+  return updatedUser;
+}
+
+// Dành cho Admin: Lấy tất cả user, có thể lọc theo vai trò
+async getAllUsers(role?: string): Promise<User[]> {
+  const query = role ? { role } : {};
+  return this.userModel.find(query).select('-password').exec();
+}
+async markEmailAsVerified(userId: string): Promise<void> {
+  await this.userModel.findByIdAndUpdate(userId, { isVerified: true });
+}
+
+
+
 }
 
